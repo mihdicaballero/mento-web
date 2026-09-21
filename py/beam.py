@@ -13,9 +13,10 @@ import contextlib
 import copy
 import io
 import json
+import math
 import os
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import docx
 import mento
@@ -40,7 +41,7 @@ CONCRETES = {
     "EN 1992-2004": Concrete_EN_1992_2004,
 }
 
-EXAMPLE: Dict[str, Any] = {
+EXAMPLE: dict[str, Any] = {
     "code": "ACI 318-19",
     "lang": "en",
     "mode": "design",
@@ -65,17 +66,17 @@ class InputError(ValueError):
         self.field = field
 
 
-def _number(data: Dict[str, Any], key: str, *, positive: bool = True) -> float:
+def _number(data: dict[str, Any], key: str, *, positive: bool = True) -> float:
     try:
         value = float(data.get(key))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         raise InputError(key, "missing") from None
-    if value != value or (positive and value <= 0):
+    if math.isnan(value) or (positive and value <= 0):
         raise InputError(key, "positive")
     return value
 
 
-def _quantity(value: Any, unit: str, precision: int = 2) -> Optional[str]:
+def _quantity(value: Any, unit: str, precision: int = 2) -> str | None:
     if value is None:
         return None
     return f"{value.to(unit):.{precision}f~P}"
@@ -88,7 +89,7 @@ def _covers(provided: Any, required: Any) -> bool:
     return bool(provided.to(required.units).magnitude >= required.magnitude * 0.999)
 
 
-def _build_beam(data: Dict[str, Any]) -> RectangularBeam:
+def _build_beam(data: dict[str, Any]) -> RectangularBeam:
     code = data.get("code")
     if code not in CONCRETES:
         raise InputError("code", "unknown")
@@ -106,7 +107,7 @@ def _build_beam(data: Dict[str, Any]) -> RectangularBeam:
     )
 
 
-def _build_forces(data: Dict[str, Any]) -> List[Forces]:
+def _build_forces(data: dict[str, Any]) -> list[Forces]:
     forces = []
     for i, row in enumerate(data.get("forces") or []):
         m_y = float(row.get("M_y") or 0)
@@ -121,8 +122,8 @@ def _build_forces(data: Dict[str, Any]) -> List[Forces]:
     return forces
 
 
-def _apply_rebar(beam: RectangularBeam, rebar: Dict[str, Any]) -> None:
-    def face(values: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_rebar(beam: RectangularBeam, rebar: dict[str, Any]) -> None:
+    def face(values: dict[str, Any]) -> dict[str, Any]:
         n1, n2 = int(values.get("n1") or 0), int(values.get("n2") or 0)
         d1, d2 = float(values.get("d1") or 0), float(values.get("d2") or 0)
         return {"n1": n1, "d_b1": d1 * mm if n1 else None, "n2": n2, "d_b2": d2 * mm if n2 else None}
@@ -142,7 +143,7 @@ def _apply_rebar(beam: RectangularBeam, rebar: Dict[str, Any]) -> None:
         )
 
 
-def _rows(layers: Any, room: float, gap: float) -> List[List[Any]]:
+def _rows(layers: Any, room: float, gap: float) -> list[list[Any]]:
     """Split the bar groups of one face into rows, nearest the face first.
 
     mento lists up to four groups, corner and inner bars of the first row and then of the
@@ -163,7 +164,7 @@ def _rows(layers: Any, room: float, gap: float) -> List[List[Any]]:
     return [groups[:1], groups[1:]]
 
 
-def _section(beam: RectangularBeam) -> Dict[str, Any]:
+def _section(beam: RectangularBeam) -> dict[str, Any]:
     """Section geometry in cm, origin at the bottom left corner, for the page to draw."""
     width = float(beam.width.to("cm").magnitude)
     height = float(beam.height.to("cm").magnitude)
@@ -175,7 +176,7 @@ def _section(beam: RectangularBeam) -> Dict[str, Any]:
     row_gap = float(beam.settings.layers_spacing.to("cm").magnitude)
     bend = 0.43 * stirrup
 
-    bars: List[Dict[str, float]] = []
+    bars: list[dict[str, float]] = []
 
     def place(layers: Any, bottom: bool) -> None:
         offset = edge
@@ -224,14 +225,14 @@ def _detailed_text(node: Node) -> str:
 
 def _bars(layers: Any) -> str:
     """``3Ø16 + 2Ø12``: bars of one diameter are counted together, the way they are ordered on site."""
-    counts: Dict[float, int] = {}
+    counts: dict[float, int] = {}
     for layer in layers:
         diameter = float(layer.d_b.to("mm").magnitude)
         counts[diameter] = counts.get(diameter, 0) + layer.n
     return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
 
 
-def _face(face: Any) -> Dict[str, Any]:
+def _face(face: Any) -> dict[str, Any]:
     return {
         "bars": _bars(face.layers),
         "A_s": _quantity(face.A_s, "cm**2"),
@@ -244,7 +245,7 @@ def _face(face: Any) -> Dict[str, Any]:
     }
 
 
-def _solve(data: Dict[str, Any]) -> Dict[str, Any]:
+def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
 
@@ -292,7 +293,7 @@ def run(payload: str) -> str:
     return json.dumps(result)
 
 
-def _merge_documents(paths: List[str]) -> bytes:
+def _merge_documents(paths: list[str]) -> bytes:
     """One Word file out of several: each extra document starts on a new page of the first."""
     merged = docx.Document(paths[0])
     for path in paths[1:]:
@@ -325,7 +326,7 @@ def report(payload: str) -> str:
     with tempfile.TemporaryDirectory() as folder:
         os.chdir(folder)
         try:
-            paths: List[str] = []
+            paths: list[str] = []
             # mento writes one file per check, named in the report language.
             for write in (node.flexure_results_detailed_doc, node.shear_results_detailed_doc):
                 with contextlib.redirect_stdout(io.StringIO()):
