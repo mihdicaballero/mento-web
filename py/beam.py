@@ -10,20 +10,17 @@ from __future__ import annotations
 
 import base64
 import contextlib
+import copy
 import io
 import json
+import math
 import os
 import tempfile
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-import matplotlib
-
-matplotlib.use("Agg")
-
-import matplotlib.pyplot as plt  # noqa: E402
-
-import mento  # noqa: E402
-from mento import (  # noqa: E402
+import docx
+import mento
+from mento import (
     Concrete_ACI_318_19,
     Concrete_CIRSOC_201_25,
     Concrete_EN_1992_2004,
@@ -44,7 +41,7 @@ CONCRETES = {
     "EN 1992-2004": Concrete_EN_1992_2004,
 }
 
-EXAMPLE: Dict[str, Any] = {
+EXAMPLE: dict[str, Any] = {
     "code": "ACI 318-19",
     "lang": "en",
     "mode": "design",
@@ -69,17 +66,17 @@ class InputError(ValueError):
         self.field = field
 
 
-def _number(data: Dict[str, Any], key: str, *, positive: bool = True) -> float:
+def _number(data: dict[str, Any], key: str, *, positive: bool = True) -> float:
     try:
         value = float(data.get(key))  # type: ignore[arg-type]
     except (TypeError, ValueError):
         raise InputError(key, "missing") from None
-    if value != value or (positive and value <= 0):
+    if math.isnan(value) or (positive and value <= 0):
         raise InputError(key, "positive")
     return value
 
 
-def _quantity(value: Any, unit: str, precision: int = 2) -> Optional[str]:
+def _quantity(value: Any, unit: str, precision: int = 2) -> str | None:
     if value is None:
         return None
     return f"{value.to(unit):.{precision}f~P}"
@@ -92,7 +89,7 @@ def _covers(provided: Any, required: Any) -> bool:
     return bool(provided.to(required.units).magnitude >= required.magnitude * 0.999)
 
 
-def _build_beam(data: Dict[str, Any]) -> RectangularBeam:
+def _build_beam(data: dict[str, Any]) -> RectangularBeam:
     code = data.get("code")
     if code not in CONCRETES:
         raise InputError("code", "unknown")
@@ -110,7 +107,7 @@ def _build_beam(data: Dict[str, Any]) -> RectangularBeam:
     )
 
 
-def _build_forces(data: Dict[str, Any]) -> List[Forces]:
+def _build_forces(data: dict[str, Any]) -> list[Forces]:
     forces = []
     for i, row in enumerate(data.get("forces") or []):
         m_y = float(row.get("M_y") or 0)
@@ -125,8 +122,8 @@ def _build_forces(data: Dict[str, Any]) -> List[Forces]:
     return forces
 
 
-def _apply_rebar(beam: RectangularBeam, rebar: Dict[str, Any]) -> None:
-    def face(values: Dict[str, Any]) -> Dict[str, Any]:
+def _apply_rebar(beam: RectangularBeam, rebar: dict[str, Any]) -> None:
+    def face(values: dict[str, Any]) -> dict[str, Any]:
         n1, n2 = int(values.get("n1") or 0), int(values.get("n2") or 0)
         d1, d2 = float(values.get("d1") or 0), float(values.get("d2") or 0)
         return {"n1": n1, "d_b1": d1 * mm if n1 else None, "n2": n2, "d_b2": d2 * mm if n2 else None}
@@ -146,13 +143,72 @@ def _apply_rebar(beam: RectangularBeam, rebar: Dict[str, Any]) -> None:
         )
 
 
-def _section_svg(beam: RectangularBeam) -> str:
-    fig = beam.plot()
-    buffer = io.StringIO()
-    fig.savefig(buffer, format="svg", bbox_inches="tight", transparent=True)
-    plt.close(fig)
-    svg = buffer.getvalue()
-    return svg[svg.index("<svg") :]
+def _rows(layers: Any, room: float, gap: float) -> list[list[Any]]:
+    """Split the bar groups of one face into rows, nearest the face first.
+
+    mento lists up to four groups, corner and inner bars of the first row and then of the
+    second, but leaves out the empty ones. So whether the second group shares the first row
+    is decided by whether it fits between the stirrup legs.
+    """
+    groups = list(layers)
+    if len(groups) == 4:
+        return [groups[:2], groups[2:]]
+    if len(groups) < 2:
+        return [groups]
+    first = groups[:2]
+    bars = sum(group.n for group in first)
+    diameters = [float(group.d_b.to("cm").magnitude) for group in first]
+    needed = sum(group.n * d for group, d in zip(first, diameters)) + (bars - 1) * max(gap, *diameters)
+    if needed <= room + 1e-6:
+        return [first, groups[2:]] if len(groups) > 2 else [first]
+    return [groups[:1], groups[1:]]
+
+
+def _section(beam: RectangularBeam) -> dict[str, Any]:
+    """Section geometry in cm, origin at the bottom left corner, for the page to draw."""
+    width = float(beam.width.to("cm").magnitude)
+    height = float(beam.height.to("cm").magnitude)
+    cover = float(beam.c_c.to("cm").magnitude)
+    transverse = beam.reinforcement.transverse
+    stirrup = float(transverse.d_b.to("cm").magnitude) if transverse.n_stirrups else 0.0
+    edge = cover + stirrup
+    gap = float(beam.settings.clear_spacing.to("cm").magnitude)
+    row_gap = float(beam.settings.layers_spacing.to("cm").magnitude)
+    bend = 0.43 * stirrup
+
+    bars: list[dict[str, float]] = []
+
+    def place(layers: Any, bottom: bool) -> None:
+        offset = edge
+        for row in _rows(layers, width - 2 * edge, gap):
+            if not row:
+                continue
+            tallest = max(float(group.d_b.to("cm").magnitude) for group in row)
+            for position, group in enumerate(row):
+                d = float(group.d_b.to("cm").magnitude)
+                y = offset + d / 2 if bottom else height - offset - d / 2
+                span = width - 2 * edge - d
+                for i in range(group.n):
+                    nudge_x = nudge_y = 0.0
+                    if position == 0:  # corner bars, spread from leg to leg
+                        x = width / 2 if group.n == 1 else edge + d / 2 + i * span / (group.n - 1)
+                        if group.n > 1 and i in (0, group.n - 1):  # sit in the stirrup bend, as beam.plot() does
+                            nudge_x = bend if i == 0 else -bend
+                            nudge_y = bend if bottom else -bend
+                    else:  # inner bars, evenly between the corners
+                        x = edge + d / 2 + (i + 1) * span / (group.n + 1)
+                    bars.append({"x": round(x + nudge_x, 3), "y": round(y + nudge_y, 3), "d": round(d, 3)})
+            offset += tallest + row_gap
+
+    place(beam.reinforcement.bottom.layers, bottom=True)
+    place(beam.reinforcement.top.layers, bottom=False)
+    return {
+        "width": width,
+        "height": height,
+        "cover": cover,
+        "stirrups": {"n": int(transverse.n_stirrups or 0), "d": stirrup},
+        "bars": bars,
+    }
 
 
 def _table(frame: Any) -> str:
@@ -169,14 +225,14 @@ def _detailed_text(node: Node) -> str:
 
 def _bars(layers: Any) -> str:
     """``3Ø16 + 2Ø12``: bars of one diameter are counted together, the way they are ordered on site."""
-    counts: Dict[float, int] = {}
+    counts: dict[float, int] = {}
     for layer in layers:
         diameter = float(layer.d_b.to("mm").magnitude)
         counts[diameter] = counts.get(diameter, 0) + layer.n
     return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
 
 
-def _face(face: Any) -> Dict[str, Any]:
+def _face(face: Any) -> dict[str, Any]:
     return {
         "bars": _bars(face.layers),
         "A_s": _quantity(face.A_s, "cm**2"),
@@ -189,7 +245,7 @@ def _face(face: Any) -> Dict[str, Any]:
     }
 
 
-def _solve(data: Dict[str, Any]) -> Dict[str, Any]:
+def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
 
@@ -221,7 +277,7 @@ def _solve(data: Dict[str, Any]) -> Dict[str, Any]:
             "enough": _covers(shear.A_v, getattr(shear, "A_v_req", None)),
         },
         "tables": {"flexure": _table(flexure_table), "shear": _table(shear_table)},
-        "svg": _section_svg(beam),
+        "section": _section(beam),
         "detailed": _detailed_text(node),
     }
 
@@ -237,11 +293,27 @@ def run(payload: str) -> str:
     return json.dumps(result)
 
 
+def _merge_documents(paths: list[str]) -> bytes:
+    """One Word file out of several: each extra document starts on a new page of the first."""
+    merged = docx.Document(paths[0])
+    for path in paths[1:]:
+        merged.add_page_break()
+        last = merged.element.body[-1]  # the section properties, which must stay at the end
+        for element in docx.Document(path).element.body:
+            if not element.tag.endswith("}sectPr"):
+                last.addprevious(copy.deepcopy(element))
+    buffer = io.BytesIO()
+    merged.save(buffer)
+    return buffer.getvalue()
+
+
 def report(payload: str) -> str:
-    """Build the Word reports and return them as ``[{"name", "base64"}]``."""
+    """Build the Word report, flexure then shear in one file, as ``[{"name", "base64"}]``."""
     data = json.loads(payload)
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
+    # mento puts the label in the names of the files it writes, so it has to be a valid file name.
+    data["label"] = "".join("_" if char in r'\/:*?"<>|' else char for char in str(data.get("label") or "B1"))
     beam = _build_beam(data)
     node = Node(section=beam, forces=_build_forces(data))
     if data.get("mode") == "check":
@@ -251,16 +323,21 @@ def report(payload: str) -> str:
         node.design()
 
     previous = os.getcwd()
-    files = []
     with tempfile.TemporaryDirectory() as folder:
         os.chdir(folder)
         try:
-            with contextlib.redirect_stdout(io.StringIO()):
-                node.flexure_results_detailed_doc()
-                node.shear_results_detailed_doc()
-            for name in sorted(os.listdir(folder)):
-                with open(os.path.join(folder, name), "rb") as handle:
-                    files.append({"name": name, "base64": base64.b64encode(handle.read()).decode("ascii")})
+            paths: list[str] = []
+            # mento writes one file per check, named in the report language.
+            for write in (node.flexure_results_detailed_doc, node.shear_results_detailed_doc):
+                with contextlib.redirect_stdout(io.StringIO()):
+                    write()
+                paths += [
+                    os.path.join(folder, name)
+                    for name in sorted(os.listdir(folder))
+                    if name not in map(os.path.basename, paths)
+                ]
+            content = _merge_documents(paths)
         finally:
             os.chdir(previous)
-    return json.dumps(files)
+    name = f"{beam.label} - {data['code']}.docx"
+    return json.dumps([{"name": name, "base64": base64.b64encode(content).decode("ascii")}])
