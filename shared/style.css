@@ -120,6 +120,10 @@ button { font: inherit; }
 /* results */
 .loading { text-align: center; padding: 28px 8px; }
 .loading p { margin: 10px 0; }
+.loading.compact { display: flex; align-items: center; gap: 10px; padding: 0 0 14px; text-align: left; font-size: 14px; color: var(--muted); }
+.loading.compact p { margin: 0; }
+.loading.compact .spinner { width: 16px; height: 16px; border-width: 2px; margin: 0; flex: none; }
+.loading.compact .steps, .loading.compact .hint { display: none; }
 .spinner { width: 36px; height: 36px; margin: 0 auto; border-radius: 50%; border: 3px solid var(--brand-soft); border-top-color: var(--brand); animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .steps { list-style: none; padding: 0; margin: 14px auto; display: inline-block; text-align: left; font-size: 14px; color: var(--muted); }

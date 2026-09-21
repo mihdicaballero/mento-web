@@ -29,5 +29,10 @@
       <div class="card soon"><strong>Tabique a corte</strong><span>Próximamente</span></div>
     </div>
   </main>
+  <script>
+    // Download Python and mento while the visitor reads, so the calculator only has to start them.
+    const warm = () => { if (!navigator.connection?.saveData) new Worker("shared/worker.js?module=beam&prefetch=1"); };
+    "requestIdleCallback" in window ? requestIdleCallback(warm) : setTimeout(warm, 1);
+  </script>
 </body>
 </html>

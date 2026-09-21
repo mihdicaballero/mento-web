@@ -16,9 +16,10 @@ const TEXT = {
     rebar: "Armadura", modeDesign: "Que la elija mento", modeCheck: "La pongo yo",
     bottom: "Inferior", top: "Superior", stirrups: "Estribos",
     rebarHint: "Cantidad y diámetro en mm. Dejá en 0 lo que no uses.",
-    loadingHint: "Solo la primera vez. Después queda guardado en tu navegador.",
+    loadingHint: "La descarga queda guardada en tu navegador; las próximas veces solo arranca Python.",
     loading: "Preparando el motor de cálculo…",
-    steps: { python: "Python en tu navegador", packages: "numpy, pandas, matplotlib", mento: "mento", warmup: "Calentando motores" },
+    loadingCached: "Tu último resultado. El motor arranca en unos segundos…",
+    steps: { python: "Python en tu navegador", packages: "numpy, pandas", mento: "mento", warmup: "Calentando motores" },
     report: "Descargar memoria (Word)", reportBusy: "Armando la memoria…", share: "Copiar link",
     tblFlexure: "Flexión por combinación", tblShear: "Corte por combinación",
     detailed: "Cálculo paso a paso", python: "El mismo cálculo en Python",
@@ -47,9 +48,10 @@ const TEXT = {
     rebar: "Reinforcement", modeDesign: "Let mento choose", modeCheck: "I'll enter it",
     bottom: "Bottom", top: "Top", stirrups: "Stirrups",
     rebarHint: "Count and diameter in mm. Leave at 0 what you don't use.",
-    loadingHint: "First visit only. After that it's cached in your browser.",
+    loadingHint: "The download stays cached in your browser; next time only Python has to start.",
     loading: "Getting the calculation engine ready…",
-    steps: { python: "Python in your browser", packages: "numpy, pandas, matplotlib", mento: "mento", warmup: "Warming up" },
+    loadingCached: "Your last result. The engine starts in a few seconds…",
+    steps: { python: "Python in your browser", packages: "numpy, pandas", mento: "mento", warmup: "Warming up" },
     report: "Download report (Word)", reportBusy: "Building the report…", share: "Copy link",
     tblFlexure: "Flexure by combination", tblShear: "Shear by combination",
     detailed: "Step-by-step calculation", python: "The same calculation in Python",
@@ -96,6 +98,21 @@ function loadState() {
 const state = loadState();
 let t = TEXT[state.lang] || TEXT.es;
 let lastResult = null;
+
+// Python takes ~10 s to start on every visit, even with every download cached.
+// Keeping the last result lets a returning visitor see their verdict at once.
+const RESULT_KEY = "mento-beam-result";
+
+function recallResult() {
+  try {
+    const cached = JSON.parse(localStorage.getItem(RESULT_KEY) || "null");
+    return cached && cached.key === JSON.stringify(state) ? cached.result : null;
+  } catch { return null; }
+}
+
+function rememberResult(key, result) {
+  try { localStorage.setItem(RESULT_KEY, JSON.stringify({ key, result })); } catch { /* private mode or quota */ }
+}
 
 function persist() {
   try { localStorage.setItem("mento-beam", JSON.stringify(state)); } catch { /* private mode */ }
@@ -149,17 +166,19 @@ let timer = 0;
 function schedule() {
   persist();
   $("pycode").textContent = pythonCode();
-  if (!ready) return;
   $("output").classList.add("stale");
+  if (!ready) return;
   clearTimeout(timer);
   timer = setTimeout(calculate, 350);
 }
 
 async function calculate() {
   const runId = ++latestRun;
+  const key = JSON.stringify(state);
   let result;
   try { result = await call("run", state); } catch (error) { result = { ok: false, kind: "mento", message: error.message }; }
   if (runId !== latestRun) return; // a newer edit is already on its way
+  if (result.ok) rememberResult(key, result);
   render(result);
 }
 
@@ -168,6 +187,36 @@ function showError(message, soft = false) {
   box.hidden = !message;
   box.textContent = message || "";
   box.classList.toggle("soft", soft);
+}
+
+// The section is drawn here rather than by beam.plot(), so the page never has to load matplotlib.
+// Geometry comes in cm with the origin at the bottom left corner; SVG's y axis points down.
+function sectionSvg({ width, height, cover, stirrups, bars }) {
+  const pad = Math.max(width, height) * 0.16;
+  const font = (Math.max(width, height) + 2 * pad) * 0.05;
+  const n = (value) => Number(value.toFixed(3));
+  const parts = [`<rect x="0" y="0" width="${n(width)}" height="${n(height)}" fill="#e9ecef" stroke="#3f4650" stroke-width="${n(font * 0.09)}"/>`];
+
+  if (stirrups.n) {
+    const d = stirrups.d;
+    const outer = width - 2 * cover;
+    // Same layout as mento: one closed stirrup, plus a centred one, or two narrow ones at the thirds.
+    const legs = [[cover, outer]];
+    if (stirrups.n === 2) legs.push([cover + outer / 4, outer / 2]);
+    if (stirrups.n >= 3) {
+      const inner = Math.min(0.25 * width, 0.4 * outer);
+      legs.push([cover + outer / 3 - inner / 2 - d, inner], [cover + (2 * outer) / 3 - inner / 2 + d, inner]);
+    }
+    for (const [x, w] of legs) {
+      parts.push(`<rect x="${n(x + d / 2)}" y="${n(cover + d / 2)}" width="${n(w - d)}" height="${n(height - 2 * cover - d)}" rx="${n(1.5 * d)}" fill="none" stroke="#7b8490" stroke-width="${n(d)}"/>`);
+    }
+  }
+  for (const bar of bars) parts.push(`<circle cx="${n(bar.x)}" cy="${n(height - bar.y)}" r="${n(bar.d / 2)}" fill="#20252c"/>`);
+
+  const text = `font-size="${n(font)}" fill="#3f4650" text-anchor="middle" font-family="inherit"`;
+  parts.push(`<text x="${n(width / 2)}" y="${n(height + pad * 0.75)}" ${text}>${n(width)} cm</text>`);
+  parts.push(`<text transform="translate(${n(-pad * 0.35)} ${n(height / 2)}) rotate(-90)" ${text}>${n(height)} cm</text>`);
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${n(-pad)} ${n(-pad * 0.4)} ${n(width + 1.6 * pad)} ${n(height + 1.4 * pad)}" role="img">${parts.join("")}</svg>`;
 }
 
 function render(result) {
@@ -217,7 +266,7 @@ function render(result) {
   setBars("outBot", flexure.bottom.bars);
   setBars("outStirrups", shear.stirrups);
 
-  $("drawing").innerHTML = result.svg;
+  $("drawing").innerHTML = sectionSvg(result.section);
   $("checks").innerHTML = checks.map((c) => {
     const level = c.dcr > 1 || !c.enough ? "bad" : "";
     const note = !c.enough && c.dcr <= 1 ? ` · ${t.notEnough}` : "";
@@ -321,7 +370,7 @@ function applyLanguage() {
   document.title = t.pageTitle;
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t[el.dataset.i18n]; });
   document.querySelectorAll("[data-i18n-html]").forEach((el) => { el.textContent = t[el.dataset.i18nHtml]; });
-  $("loadingText").textContent = t.loading;
+  $("loadingText").textContent = $("loading").classList.contains("compact") ? t.loadingCached : t.loading;
   for (const li of $("steps").children) li.textContent = t.steps[li.dataset.step];
   renderForces();
 }
@@ -339,7 +388,13 @@ async function copy(text, message) {
 }
 
 function init() {
+  const cached = recallResult();
+  $("loading").classList.toggle("compact", Boolean(cached));
   applyLanguage();
+  if (cached) {
+    // A result saved by an older version of the page may not have today's shape.
+    try { render(cached); } catch { $("output").hidden = true; $("loading").classList.remove("compact"); applyLanguage(); }
+  }
   for (const id of NUMERIC) {
     $(id).value = state[id];
     $(id).addEventListener("input", () => { state[id] = $(id).value; schedule(); });

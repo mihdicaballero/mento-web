@@ -1,7 +1,10 @@
 """The glue is plain Python, so it is tested without a browser."""
 
+import base64
+import io
 import json
 
+import docx
 import pytest
 
 import beam
@@ -20,7 +23,31 @@ def test_design_passes_for_every_code(code):
     assert result["flexure"]["bottom"]["bars"]
     assert result["flexure"]["bottom"]["DCR"] <= 1
     assert result["shear"]["DCR"] <= 1
-    assert result["svg"].startswith("<svg")
+    assert "svg" not in result  # the page draws the section itself; matplotlib is never loaded there
+
+
+def test_section_places_every_bar_inside_the_stirrup():
+    rebar = {
+        "bot": {"n1": 2, "d1": 16, "n2": 1, "d2": 12},
+        "top": {"n1": 2, "d1": 10},
+        "stirrups": {"n": 1, "d": 8, "s": 15},
+    }
+    section = solve(mode="check", rebar=rebar)["section"]
+    assert section["stirrups"] == {"n": 1, "d": 0.8}
+    assert sorted(bar["d"] for bar in section["bars"]) == [1.0, 1.0, 1.2, 1.6, 1.6]
+    edge = section["cover"] + section["stirrups"]["d"]
+    for bar in section["bars"]:
+        assert edge <= bar["x"] - bar["d"] / 2 and bar["x"] + bar["d"] / 2 <= section["width"] - edge + 1e-9
+        assert edge <= bar["y"] - bar["d"] / 2 and bar["y"] + bar["d"] / 2 <= section["height"] - edge + 1e-9
+    bottom = [bar for bar in section["bars"] if bar["y"] < section["height"] / 2]
+    assert [bar["x"] for bar in sorted(bottom, key=lambda bar: bar["x"])][1] == section["width"] / 2
+
+
+def test_section_moves_bars_that_do_not_fit_to_a_second_row():
+    result = solve(width=12, height=30, forces=[{"label": "U", "M_y": 40, "V_z": 50}])
+    assert result["ok"], result
+    bottom = [bar for bar in result["section"]["bars"] if bar["y"] < result["section"]["height"] / 2]
+    assert len({bar["y"] for bar in bottom}) == 2, result["flexure"]["bottom"]["bars"]
 
 
 def test_check_mode_reports_insufficient_rebar():
@@ -46,7 +73,10 @@ def test_no_forces_is_an_input_error():
     assert solve(forces=[{"M_y": 0, "V_z": 0}])["field"] == "forces"
 
 
-def test_report_returns_two_word_files():
-    files = json.loads(beam.report(json.dumps(beam.EXAMPLE)))
-    assert len(files) == 2
-    assert all(f["name"].endswith(".docx") and f["base64"] for f in files)
+def test_report_is_one_word_file_with_flexure_and_shear():
+    (file,) = json.loads(beam.report(json.dumps({**beam.EXAMPLE, "label": "V1/2"})))
+    assert file["name"] == "V1_2 - ACI 318-19.docx"
+    document = docx.Document(io.BytesIO(base64.b64decode(file["base64"])))
+    text = " ".join(paragraph.text.lower() for paragraph in document.paragraphs)
+    assert "flexur" in text and "shear" in text
+    assert len(document.tables) >= 8
