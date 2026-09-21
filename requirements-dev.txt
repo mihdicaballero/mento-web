@@ -1,0 +1,5 @@
+# Keep in step with MENTO_VERSION and the pint cap in shared/worker.js.
+mento==1.2.0
+pint<0.26
+pytest
+ruff

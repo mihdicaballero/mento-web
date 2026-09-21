@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>mento · Diseño de vigas de hormigón armado</title>
+  <meta name="description" content="Diseñá y verificá vigas de hormigón armado a flexión y corte según ACI 318-19, CIRSOC 201-25 y EN 1992. Gratis, open source, corre en tu navegador.">
+  <meta name="theme-color" content="#4890d2">
+  <link rel="icon" href="../shared/logo.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="../shared/style.css">
+</head>
+<body>
+  <header class="top">
+    <a class="brand" href="../">
+      <img src="../shared/logo.svg" alt="" width="32" height="32">
+      <span>mento</span>
+    </a>
+    <nav class="top-actions">
+      <a href="https://mento-docs.readthedocs.io/" target="_blank" rel="noopener" data-i18n="docs">Docs</a>
+      <div class="segmented small" id="lang" role="group" aria-label="Language">
+        <button type="button" data-value="es">ES</button>
+        <button type="button" data-value="en">EN</button>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section class="intro">
+      <h1 data-i18n="title">Viga rectangular de hormigón armado</h1>
+      <p data-i18n="subtitle">Cargá la sección y los esfuerzos. mento elige la armadura y verifica flexión y corte según la norma.</p>
+    </section>
+
+    <div class="layout">
+      <form id="form" class="panel inputs" autocomplete="off" novalidate>
+        <fieldset>
+          <legend data-i18n="code">Norma</legend>
+          <div class="segmented" id="code" role="group">
+            <button type="button" data-value="ACI 318-19">ACI 318-19</button>
+            <button type="button" data-value="CIRSOC 201-25">CIRSOC 201-25</button>
+            <button type="button" data-value="EN 1992-2004">EN 1992</button>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="materials">Materiales</legend>
+          <div class="grid two">
+            <label class="field"><span><i>f</i><sub>c</sub> <em data-i18n="concrete">hormigón</em></span>
+              <div class="input"><input id="fc" type="number" inputmode="decimal" min="1" step="any"><u>MPa</u></div>
+            </label>
+            <label class="field"><span><i>f</i><sub>y</sub> <em data-i18n="steel">acero</em></span>
+              <div class="input"><input id="fy" type="number" inputmode="decimal" min="1" step="any"><u>MPa</u></div>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="section">Sección</legend>
+          <div class="grid three">
+            <label class="field"><span><i>b</i> <em data-i18n="width">ancho</em></span>
+              <div class="input"><input id="width" type="number" inputmode="decimal" min="1" step="any"><u>cm</u></div>
+            </label>
+            <label class="field"><span><i>h</i> <em data-i18n="height">altura</em></span>
+              <div class="input"><input id="height" type="number" inputmode="decimal" min="1" step="any"><u>cm</u></div>
+            </label>
+            <label class="field"><span><i>c</i><sub>c</sub> <em data-i18n="cover">recubrimiento</em></span>
+              <div class="input"><input id="cover" type="number" inputmode="decimal" min="1" step="any"><u>mm</u></div>
+            </label>
+          </div>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="forces">Esfuerzos de diseño</legend>
+          <p class="hint" data-i18n="forcesHint">Mayorados. Momento positivo tracciona abajo; negativo, arriba.</p>
+          <div class="forces-head">
+            <span data-i18n="comb">Combinación</span><span><i>M</i> <u>kNm</u></span><span><i>V</i> <u>kN</u></span><span></span>
+          </div>
+          <div id="forces"></div>
+          <button type="button" class="ghost" id="addForce">+ <span data-i18n="addForce">Agregar combinación</span></button>
+        </fieldset>
+
+        <fieldset>
+          <legend data-i18n="rebar">Armadura</legend>
+          <div class="segmented" id="mode" role="group">
+            <button type="button" data-value="design" data-i18n="modeDesign">Que la elija mento</button>
+            <button type="button" data-value="check" data-i18n="modeCheck">La pongo yo</button>
+          </div>
+          <div id="rebarInputs" hidden>
+            <div class="rebar-row"><strong data-i18n="bottom">Inferior</strong>
+              <div class="bars"><input id="bot_n1" type="number" inputmode="numeric" min="0" step="1"><b>Ø</b><input id="bot_d1" type="number" inputmode="decimal" min="0" step="any">
+              <b>+</b><input id="bot_n2" type="number" inputmode="numeric" min="0" step="1"><b>Ø</b><input id="bot_d2" type="number" inputmode="decimal" min="0" step="any"></div>
+            </div>
+            <div class="rebar-row"><strong data-i18n="top">Superior</strong>
+              <div class="bars"><input id="top_n1" type="number" inputmode="numeric" min="0" step="1"><b>Ø</b><input id="top_d1" type="number" inputmode="decimal" min="0" step="any">
+              <b>+</b><input id="top_n2" type="number" inputmode="numeric" min="0" step="1"><b>Ø</b><input id="top_d2" type="number" inputmode="decimal" min="0" step="any"></div>
+            </div>
+            <div class="rebar-row"><strong data-i18n="stirrups">Estribos</strong>
+              <div class="bars"><input id="st_n" type="number" inputmode="numeric" min="0" step="1"><b>eØ</b><input id="st_d" type="number" inputmode="decimal" min="0" step="any">
+              <b>/</b><input id="st_s" type="number" inputmode="decimal" min="0" step="any"><b>cm</b></div>
+            </div>
+            <p class="hint" data-i18n="rebarHint">Cantidad y diámetro en mm. Dejá en 0 lo que no uses.</p>
+          </div>
+        </fieldset>
+      </form>
+
+      <section class="panel results" id="results" aria-live="polite">
+        <div id="loading" class="loading">
+          <div class="spinner" aria-hidden="true"></div>
+          <p id="loadingText"></p>
+          <ol class="steps" id="steps">
+            <li data-step="python"></li><li data-step="packages"></li><li data-step="mento"></li><li data-step="warmup"></li>
+          </ol>
+          <p class="hint" data-i18n="loadingHint">Solo la primera vez. Después queda guardado en tu navegador.</p>
+        </div>
+
+        <div id="error" class="notice" hidden></div>
+
+        <div id="output" hidden>
+          <div class="verdict" id="verdict"></div>
+
+          <div class="answer">
+            <figure id="drawing" class="drawing"></figure>
+            <dl class="rebar-list">
+              <div><dt data-i18n="top">Superior</dt><dd id="outTop"></dd></div>
+              <div><dt data-i18n="bottom">Inferior</dt><dd id="outBot"></dd></div>
+              <div><dt data-i18n="stirrups">Estribos</dt><dd id="outStirrups"></dd></div>
+            </dl>
+          </div>
+
+          <div class="checks" id="checks"></div>
+
+          <div class="actions">
+            <button type="button" class="primary" id="btnReport" data-i18n="report">Descargar memoria (Word)</button>
+            <button type="button" id="btnShare" data-i18n="share">Copiar link</button>
+          </div>
+
+          <details><summary data-i18n="tblFlexure">Flexión por combinación</summary><div class="table-wrap" id="tblFlexure"></div></details>
+          <details><summary data-i18n="tblShear">Corte por combinación</summary><div class="table-wrap" id="tblShear"></div></details>
+          <details><summary data-i18n="detailed">Cálculo paso a paso</summary><pre id="detailed"></pre></details>
+          <details><summary data-i18n="python">El mismo cálculo en Python</summary>
+            <p class="hint" data-i18n="pythonHint">Esta página usa el paquete open source mento. Con estas líneas obtenés lo mismo en un notebook.</p>
+            <pre id="pycode"></pre>
+            <button type="button" id="btnCopyCode" data-i18n="copy">Copiar</button>
+          </details>
+        </div>
+      </section>
+    </div>
+
+    <footer>
+      <p data-i18n-html="disclaimer"></p>
+      <p><span id="versionTag"></span> · MIT · <a href="https://github.com/mihdicaballero/mento" target="_blank" rel="noopener">GitHub</a> · <a href="https://github.com/mihdicaballero/mento/discussions" target="_blank" rel="noopener" data-i18n="feedback">Contanos qué te pareció</a></p>
+    </footer>
+  </main>
+
+  <a class="dock" id="dock" href="#results" hidden></a>
+  <div class="toast" id="toast" hidden></div>
+
+  <script src="app.js" type="module"></script>
+</body>
+</html>
