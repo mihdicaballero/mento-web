@@ -1,0 +1,39 @@
+name: Test count
+
+# The home shows how many tests mento runs against published examples. mento's release
+# workflow attaches that number to the release as stats.json and pings this repository;
+# this job copies it to shared/stats.json and commits it, so the static site can read it.
+on:
+  repository_dispatch:
+    types: [mento-release]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch stats.json from the latest mento release
+        run: |
+          curl -fsSL https://github.com/mihdicaballero/mento/releases/latest/download/stats.json -o /tmp/stats.json
+          python3 - <<'EOF'
+          import json
+          stats = json.load(open("/tmp/stats.json"))
+          tests = stats.get("tests")
+          if not isinstance(tests, int) or tests <= 0:
+              raise SystemExit(f"stats.json has no positive integer 'tests': {stats!r}")
+          with open("shared/stats.json", "w") as out:
+              json.dump({"tests": tests}, out)
+              out.write("\n")
+          EOF
+      - name: Commit if it changed
+        run: |
+          git add shared/stats.json
+          git diff --cached --quiet && exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: test count from mento $(curl -fsSL https://pypi.org/pypi/mento/json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')"
+          git push

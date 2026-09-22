@@ -81,15 +81,19 @@ async function boot() {
   await micropip.install.callKwargs([`mento==${MENTO_VERSION}`], { deps: false });
 
   if (PREFETCH) {
-    await fetch(new URL(`../py/${MODULE}.py`, self.location.href));
+    await Promise.all(["common", MODULE].map((name) => fetch(new URL(`../py/${name}.py`, self.location.href))));
     return null;
   }
 
   progress("warmup");
   pyodide.runPython(STUBS);
-  const response = await fetch(new URL(`../py/${MODULE}.py`, self.location.href));
-  if (!response.ok) throw new Error(`py/${MODULE}.py: HTTP ${response.status}`);
-  pyodide.FS.writeFile(`/home/pyodide/${MODULE}.py`, await response.text());
+  // py/common.py holds what the calculators share, so it travels with every one of them.
+  for (const name of ["common", MODULE]) {
+    // Revalidated every time: a glue module a release older than the page breaks the import.
+    const response = await fetch(new URL(`../py/${name}.py`, self.location.href), { cache: "no-cache" });
+    if (!response.ok) throw new Error(`py/${name}.py: HTTP ${response.status}`);
+    pyodide.FS.writeFile(`/home/pyodide/${name}.py`, await response.text());
+  }
   const api = pyodide.pyimport(MODULE);
   // First call pays for mento's lazy imports; do it before the user asks.
   api.run(JSON.stringify(api.EXAMPLE.toJs({ dict_converter: Object.fromEntries })));
