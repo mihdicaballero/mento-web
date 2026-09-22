@@ -406,6 +406,15 @@ a.btn--sec:hover,a.btn--sec:active{color:var(--brand-ink)}
 .dw-dim{font-size:var(--fs-14)}
 /* the drawing's own Copiá (3.11's small secondary button), in the corner facing its label */
 .drawing .drawing-copy{position:absolute;right:10px;top:6px}
+/* a disclosure's Copiá cannot live inside its <summary>: a control inside a control is announced
+   badly by screen readers. It sits beside the <details>, over the summary's row, as 3.14 draws it */
+.disc-wrap{position:relative}
+.disc-wrap > .disc summary{padding-right:120px}
+.disc-wrap > .disc-copy{position:absolute;right:var(--s-4);top:8px}
+.disc-wrap > .disc-copy--dark{background:transparent;color:#fff;border-color:#4a5563}
+.disc-wrap > .disc-copy--dark:hover{background:#252a30}
+/* AA contrast: --ink-3 is "never for information" (tokens), and these two carry some */
+.soon-strip .eyebrow,.steps li[data-s="todo"]{color:var(--ink-2)}
 /* number fields without the spinner: ↑/↓ already step the value (5.2), and the arrows took the
    room of a third digit in the 236 px station (b = 120 did not fit) */
 input[type="number"]{-moz-appearance:textfield;appearance:textfield}
@@ -420,7 +429,7 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
   .top .title{min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* the same in a disclosure's summary: the API name gives way, the Copiá button keeps its size */
   .disc summary .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .disc summary .btn{flex:none}
+  .disc-wrap > .disc-copy{top:1px;flex:none}
   /* the control is 44 px, so the input inside it has to be too: tapping its padding must land on the field */
   .field .in input,.field .in.sel select,.cell input{height:100%}
 }

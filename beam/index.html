@@ -35,6 +35,7 @@
 </header>
 <div class="verdict-strip" id="strip" data-state="loading" aria-live="polite"><span class="spin"></span><span style="font-size:14px" data-i18n="warm">Preparando el motor</span><span class="readout" style="font-size:16px"></span></div>
 <main class="calc">
+<h1 class="vh" data-i18n="beam">Viga rectangular</h1>
 <div class="stations">
   <section class="station station-1"><div class="st"><b>1</b><span data-i18n="s1">Datos</span></div>
     <label class="field"><span class="lbl" data-i18n="code">Norma</span><span class="in sel"><select id="code"></select></span></label>
@@ -100,13 +101,13 @@
 
 <div class="below">
   <details class="disc" id="disc-flexure" open><summary><span data-i18n="tflex">Resultados de flexión</span><span class="lbl">node.check_flexure()</span></summary>
-    <div class="df-wrap" id="table-flexure"></div></details>
+    <div class="df-wrap" id="table-flexure" tabindex="0" role="region" data-i18n-aria="tflex" aria-label="Resultados de flexión"></div></details>
   <details class="disc" id="disc-shear" open><summary><span data-i18n="tshear">Resultados de corte</span><span class="lbl">node.check_shear()</span></summary>
-    <div class="df-wrap" id="table-shear"></div></details>
-  <details class="disc" id="disc-detailed"><summary><span data-i18n="tdet">Resultados detallados</span><span class="lbl">node.flexure_results_detailed()</span><button class="btn btn--sec btn--small" type="button" id="copy-detailed" style="margin-left:16px"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></summary>
-    <pre class="textblock" id="detailed"></pre></details>
-  <details class="disc disc--code" id="disc-python"><summary><span data-i18n="tpy">Reproducilo en Python</span><span class="lbl">pip install mento</span><button class="btn btn--sec btn--small" type="button" id="copy-python" style="margin-left:16px"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></summary>
-    <pre class="codeblock" id="python"></pre></details>
+    <div class="df-wrap" id="table-shear" tabindex="0" role="region" data-i18n-aria="tshear" aria-label="Resultados de corte"></div></details>
+  <div class="disc-wrap"><details class="disc" id="disc-detailed"><summary><span data-i18n="tdet">Resultados detallados</span><span class="lbl">node.flexure_results_detailed()</span></summary>
+    <pre class="textblock" id="detailed" tabindex="0" role="region" data-i18n-aria="tdet" aria-label="Resultados detallados"></pre></details><button class="btn btn--sec btn--small disc-copy" type="button" id="copy-detailed"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></div>
+  <div class="disc-wrap"><details class="disc disc--code" id="disc-python"><summary><span data-i18n="tpy">Reproducilo en Python</span><span class="lbl">pip install mento</span></summary>
+    <pre class="codeblock" id="python" tabindex="0" role="region" data-i18n-aria="tpy" aria-label="Reproducilo en Python"></pre></details><button class="btn btn--sec btn--small disc-copy disc-copy--dark" type="button" id="copy-python"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></div>
 </div>
 <footer class="foot"><span data-i18n="footer">Herramienta de apoyo. La verificación final es responsabilidad del profesional.</span><span class="spacer"></span><span><a href="https://github.com/mihdicaballero/mento">GitHub</a> · <a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a> · <a href="https://github.com/mihdicaballero/mento/discussions" data-i18n="feedback">Contanos qué te pareció</a></span></footer>
 </main>

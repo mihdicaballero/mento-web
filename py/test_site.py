@@ -150,3 +150,10 @@ def test_every_calculator_has_the_beams_forces_block(page):
     assert station_2(page) == station_2("beam")
     app = (ROOT / page / "app.js").read_text(encoding="utf-8")
     assert 'forces: ["M_y", "V_z", "N_x"],' in app
+
+
+def test_stats_json_is_either_published_or_empty():
+    """The home reads the test count from here. Until mento's release workflow publishes it, it holds
+    null and the band shows no figure: a number is only ever the one CI wrote (stats.yml)."""
+    tests = json.loads((ROOT / "shared" / "stats.json").read_text(encoding="utf-8"))["tests"]
+    assert tests is None or (isinstance(tests, int) and tests > 0)
