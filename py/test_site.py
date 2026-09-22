@@ -144,8 +144,8 @@ def test_every_calculator_has_the_beams_forces_block(page):
 
     def station_2(name: str) -> str:
         source = PAGES[name].read_text(encoding="utf-8")
-        block = re.search(r'<section class="station station-2">.*?</section>', source, re.S).group(0)  # type: ignore[union-attr]
-        return re.sub(r'(data-i18n-html="hint2">).*?(</p>)', r"\1\2", block, flags=re.S)
+        block = re.search(r'<section class="station station-2">.*?</section>', source, re.DOTALL).group(0)  # type: ignore[union-attr]
+        return re.sub(r'(data-i18n-html="hint2">).*?(</p>)', r"\1\2", block, flags=re.DOTALL)
 
     assert station_2(page) == station_2("beam")
     app = (ROOT / page / "app.js").read_text(encoding="utf-8")

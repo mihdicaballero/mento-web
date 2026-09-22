@@ -2,6 +2,7 @@
 
 import base64
 import io
+import itertools
 import json
 
 import docx
@@ -79,7 +80,7 @@ def test_the_drawing_places_a_bar_every_spacing():
     bottom = sorted(bar["x"] for bar in section["bars"] if bar["y"] < section["height"] / 2)
     spacing = solve()["layouts"]["bot"]["s"]
     assert len(bottom) >= 2
-    assert all(abs(second - first - spacing) < 1e-6 for first, second in zip(bottom, bottom[1:]))
+    assert all(abs(second - first - spacing) < 1e-6 for first, second in itertools.pairwise(bottom))
     assert 0 <= bottom[0] and bottom[-1] <= section["width"]
 
 

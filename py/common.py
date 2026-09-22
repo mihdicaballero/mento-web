@@ -13,7 +13,8 @@ import io
 import math
 import os
 import tempfile
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 import docx
 from docx.oxml import OxmlElement

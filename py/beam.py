@@ -17,7 +17,6 @@ from typing import Any
 
 import common
 import mento
-from mento.rebar import Rebar
 from mento import (
     Concrete_ACI_318_19,
     Concrete_CIRSOC_201_25,
@@ -32,6 +31,7 @@ from mento import (
     kNm,
     mm,
 )
+from mento.rebar import Rebar
 
 CONCRETES = {
     "ACI 318-19": Concrete_ACI_318_19,
