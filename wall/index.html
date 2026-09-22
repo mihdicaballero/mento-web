@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title data-i18n="page_title">mento · Viga rectangular de hormigón armado</title>
-<meta name="description" data-i18n-content="page_desc" content="Diseñá la armadura de una viga rectangular o verificá la tuya: flexión y corte por combinación según ACI 318-19, CIRSOC 201-25 y EN 1992, en tu navegador.">
+<title data-i18n="page_title">mento · Tabique de hormigón armado</title>
+<meta name="description" data-i18n-content="page_desc" content="Diseñá la malla de un tabique de hormigón armado o verificá la tuya: corte en el plano por combinación según ACI 318-19, CIRSOC 201-25 y EN 1992, en tu navegador.">
 <meta name="theme-color" content="#4890d2">
 <link rel="icon" href="../shared/logo.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -28,7 +28,7 @@
 <div class="page">
 <header class="top">
   <a class="brand" href="../"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a>
-  <span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="beam">Viga rectangular</span><span class="sub" data-i18n="beamsub">flexión + corte</span>
+  <span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="wall">Tabique</span><span class="sub" data-i18n="wallsub">corte en el plano</span>
   <span class="spacer"></span>
   <nav><a href="../" data-i18n="calc">Calculadoras</a><a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a>
     <div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div></nav>
@@ -41,21 +41,24 @@
     <label class="field"><span class="lbl" data-i18n="conc">Hormigón</span><span class="in sel"><select id="fc"></select></span></label>
     <label class="field"><span class="lbl" data-i18n="steel">Acero</span><span class="in sel"><select id="fy"></select></span></label>
     <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:4px">
-      <label class="field" id="field-width"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">b</i></span><span class="in"><input id="width" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_width" aria-label="Ancho b, en cm" aria-describedby="err-width"><span class="unit">cm</span></span><span class="err" id="err-width" hidden></span></label>
-      <label class="field" id="field-height"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">h</i></span><span class="in"><input id="height" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_height" aria-label="Altura h, en cm" aria-describedby="err-height"><span class="unit">cm</span></span><span class="err" id="err-height" hidden></span></label>
+      <label class="field" id="field-thickness"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">t</i><sub style="text-transform:none;letter-spacing:0">w</sub></span><span class="in"><input id="thickness" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_thickness" aria-label="Espesor tw, en cm" aria-describedby="err-thickness"><span class="unit">cm</span></span><span class="err" id="err-thickness" hidden></span></label>
+      <label class="field" id="field-length"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">l</i><sub style="text-transform:none;letter-spacing:0">w</sub></span><span class="in"><input id="length" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_length" aria-label="Longitud lw, en cm" aria-describedby="err-length"><span class="unit">cm</span></span><span class="err" id="err-length" hidden></span></label>
+      <label class="field" id="field-wall_height"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">h</i><sub style="text-transform:none;letter-spacing:0">w</sub></span><span class="in"><input id="wall_height" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_wall_height" aria-label="Altura del tabique hw, en cm" aria-describedby="err-wall_height"><span class="unit">cm</span></span><span class="err" id="err-wall_height" hidden></span></label>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
       <label class="field" id="field-cover"><span class="lbl"><i class="sym" style="text-transform:none;font-size:13px;letter-spacing:0">c</i><sub style="text-transform:none;letter-spacing:0">c</sub></span><span class="in"><input id="cover" type="number" inputmode="decimal" min="1" step="any" data-i18n-aria="aria_cover" aria-label="Recubrimiento cc, en mm" aria-describedby="err-cover"><span class="unit">mm</span></span><span class="err" id="err-cover" hidden></span></label>
     </div>
     <label class="field"><span class="lbl" data-i18n="label">Nombre</span><span class="in"><input id="label" type="text" maxlength="24" style="text-align:left;font-family:var(--font-sans)"></span></label>
   </section>
 
-  <div class="drawing"><span class="lbl" data-i18n="drawing">Sección · a escala</span><button class="btn btn--sec btn--small drawing-copy" type="button" id="copy-drawing" disabled data-i18n-aria="copy_drawing" aria-label="Copiá el dibujo de la sección como imagen"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button><div id="drawing"></div></div>
+  <div class="drawing"><span class="lbl" data-i18n="drawing">Sección horizontal · a escala</span><button class="btn btn--sec btn--small drawing-copy" type="button" id="copy-drawing" disabled data-i18n-aria="copy_drawing" aria-label="Copiá el dibujo de la sección como imagen"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button><div id="drawing"></div></div>
 
   <section class="station station-2"><div class="st"><b>2</b><span data-i18n="s2">Esfuerzos</span><span class="aside lbl" data-i18n="s2h">mayorados</span></div>
     <div class="combos" id="combos" role="group" data-i18n-aria="aria_combos" aria-label="Combinaciones de carga">
       <span class="lbl" data-i18n="state">Estado</span><span class="lbl r"><i class="sym">M</i><sub>u</sub> kNm</span><span class="lbl r"><i class="sym">V</i><sub>u</sub> kN</span><span class="lbl r"><i class="sym">N</i><sub>u</sub> kN</span><span class="rm" aria-hidden="true"></span>
     </div>
     <button class="link-btn" type="button" id="add" data-i18n="add">+ Agregá una combinación</button>
-    <p class="hint" style="border-top:1px solid var(--line-3);padding-top:8px" data-i18n-html="hint2"><i class="sym">M</i> &gt; 0 tracciona abajo · <i class="sym">N</i> &gt; 0 compresión.<br><i class="sym">N</i><sub>u</sub> interviene solo en corte; la flexión no lo considera.</p>
+    <p class="hint" style="border-top:1px solid var(--line-3);padding-top:8px" data-i18n-html="hint2"><i class="sym">M</i> &gt; 0 tracciona abajo · <i class="sym">N</i> &gt; 0 compresión.<br>Hoy mento verifica el corte en el plano: <i class="sym">M</i><sub>u</sub> todavía no interviene.</p>
   </section>
 
   <section class="station station-3"><div class="st"><b>3</b><span data-i18n="s3">Armadura</span></div>
@@ -66,10 +69,9 @@
       <button class="link-btn" type="button" id="to-check" data-i18n="edit">Editá esta armadura a mano →</button>
     </div>
     <div data-s3="check" style="display:contents" hidden>
-      <div class="bars" style="margin-top:4px"><span class="lbl" data-i18n="bot">Inferior</span><span class="n"><input class="i" id="bot_n1" type="number" inputmode="numeric" min="0" step="1" data-i18n-aria="aria_bot_n1" aria-label="Inferior, cantidad 1">Ø<input class="i" id="bot_d1" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_bot_d1" aria-label="Inferior, diámetro 1 en mm"><span class="op">+</span><input class="i" id="bot_n2" type="number" inputmode="numeric" min="0" step="1" data-i18n-aria="aria_bot_n2" aria-label="Inferior, cantidad 2">Ø<input class="i" id="bot_d2" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_bot_d2" aria-label="Inferior, diámetro 2 en mm"></span></div>
-      <div class="bars"><span class="lbl" data-i18n="top">Superior</span><span class="n"><input class="i" id="top_n1" type="number" inputmode="numeric" min="0" step="1" data-i18n-aria="aria_top_n1" aria-label="Superior, cantidad 1">Ø<input class="i" id="top_d1" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_top_d1" aria-label="Superior, diámetro 1 en mm"><span class="op">+</span><input class="i" id="top_n2" type="number" inputmode="numeric" min="0" step="1" data-i18n-aria="aria_top_n2" aria-label="Superior, cantidad 2">Ø<input class="i" id="top_d2" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_top_d2" aria-label="Superior, diámetro 2 en mm"></span></div>
-      <div class="bars"><span class="lbl" data-i18n="st">Estribos</span><span class="n"><input class="i" id="st_n" type="number" inputmode="numeric" min="0" step="1" data-i18n-aria="aria_st_n" aria-label="Estribos, cantidad">eØ<input class="i" id="st_d" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_st_d" aria-label="Estribos, diámetro en mm"><span class="op">c/</span><input class="i" id="st_s" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_st_s" aria-label="Estribos, separación en cm"><span class="op">cm</span></span></div>
-      <p class="hint" data-i18n="barhint">Cantidad y Ø en mm. Dejá 0 lo que no uses.</p>
+      <div class="bars" style="margin-top:4px"><span class="lbl" data-i18n="horizontal">Malla horizontal</span><span class="n">Ø<input class="i" id="horizontal_d" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_horizontal_d" aria-label="Malla horizontal, diámetro en mm"><span class="op">c/</span><input class="i" id="horizontal_s" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_horizontal_s" aria-label="Malla horizontal, separación en cm"><span class="op">cm</span></span></div>
+      <div class="bars"><span class="lbl" data-i18n="vertical">Malla vertical</span><span class="n">Ø<input class="i" id="vertical_d" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_vertical_d" aria-label="Malla vertical, diámetro en mm"><span class="op">c/</span><input class="i" id="vertical_s" type="number" inputmode="decimal" min="0" step="any" data-i18n-aria="aria_vertical_s" aria-label="Malla vertical, separación en cm"><span class="op">cm</span></span></div>
+      <p class="hint" data-i18n="barhint">Diámetro en mm y separación en cm, en cada cara.</p>
       <button class="link-btn" type="button" id="to-design" data-i18n="back">← Volvé a la propuesta de mento</button>
     </div>
   </section>
@@ -99,11 +101,9 @@
 </div>
 
 <div class="below">
-  <details class="disc" id="disc-flexure" open><summary><span data-i18n="tflex">Resultados de flexión</span><span class="lbl">node.check_flexure()</span></summary>
-    <div class="df-wrap" id="table-flexure"></div></details>
-  <details class="disc" id="disc-shear" open><summary><span data-i18n="tshear">Resultados de corte</span><span class="lbl">node.check_shear()</span></summary>
+  <details class="disc" id="disc-shear" open><summary><span data-i18n="tshear">Resultados de corte</span><span class="lbl">wall.check_shear()</span></summary>
     <div class="df-wrap" id="table-shear"></div></details>
-  <details class="disc" id="disc-detailed"><summary><span data-i18n="tdet">Resultados detallados</span><span class="lbl">node.flexure_results_detailed()</span><button class="btn btn--sec btn--small" type="button" id="copy-detailed" style="margin-left:16px"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></summary>
+  <details class="disc" id="disc-detailed"><summary><span data-i18n="tdet">Resultados detallados</span><span class="lbl">wall.shear_results_detailed()</span><button class="btn btn--sec btn--small" type="button" id="copy-detailed" style="margin-left:16px"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></summary>
     <pre class="textblock" id="detailed"></pre></details>
   <details class="disc disc--code" id="disc-python"><summary><span data-i18n="tpy">Reproducilo en Python</span><span class="lbl">pip install mento</span><button class="btn btn--sec btn--small" type="button" id="copy-python" style="margin-left:16px"><svg width="12" height="12" aria-hidden="true"><use href="#i-copy"/></svg><span data-i18n="copy">Copiá</span></button></summary>
     <pre class="codeblock" id="python"></pre></details>

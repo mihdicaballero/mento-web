@@ -1,38 +1,130 @@
 <!doctype html>
 <html lang="es">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>mento · Calculadoras de hormigón armado</title>
-  <meta name="description" content="Calculadoras gratuitas y open source de hormigón armado según ACI 318-19, CIRSOC 201-25 y EN 1992. Corren en tu navegador.">
-  <meta name="theme-color" content="#4890d2">
-  <link rel="icon" href="shared/logo.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="shared/style.css">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title data-i18n="page_title">mento · Calculadoras de hormigón armado</title>
+<meta name="description" data-i18n-content="page_desc" content="Diseñá la armadura o verificá la tuya: vigas, losas y tabiques de hormigón armado según ACI 318-19, CIRSOC 201-25 y EN 1992. Gratis, en tu navegador.">
+<meta name="theme-color" content="#4890d2">
+<link rel="icon" href="shared/logo.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="shared/style.css">
 </head>
 <body>
-  <header class="top">
-    <a class="brand" href="./"><img src="shared/logo.svg" alt="" width="32" height="32"><span>mento</span></a>
-    <nav class="top-actions">
-      <a href="https://mento-docs.readthedocs.io/" target="_blank" rel="noopener">Docs</a>
-      <a href="https://github.com/mihdicaballero/mento" target="_blank" rel="noopener">GitHub</a>
-    </nav>
-  </header>
-  <main>
-    <section class="intro">
-      <h1>Hormigón armado, sin instalar nada</h1>
-      <p>Diseñá y verificá elementos según ACI 318-19, CIRSOC 201-25 y EN 1992. Gratis, open source, y el cálculo corre en tu navegador.</p>
-    </section>
-    <div class="cards">
-      <a class="card" href="beam/"><strong>Viga rectangular</strong><span>Flexión y corte · diseño y verificación</span></a>
-      <div class="card soon"><strong>Losa en una dirección</strong><span>Próximamente</span></div>
-      <div class="card soon"><strong>Zapata</strong><span>Próximamente</span></div>
-      <div class="card soon"><strong>Tabique a corte</strong><span>Próximamente</span></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-logo" viewBox="0 0 22 22"><rect width="22" height="22" rx="5" fill="#4890d2"/><rect x="11.6" y="4.2" width="6.2" height="6.2" rx="1.4" fill="#fff"/><rect x="4.2" y="11.6" width="6.2" height="6.2" rx="1.4" fill="#fff"/><rect x="11.6" y="11.6" width="6.2" height="6.2" rx="1.4" fill="#fff"/></symbol>
+    <symbol id="i-check" viewBox="0 0 18 18"><path d="M3 9.5l4 4 8-8" fill="none" stroke="currentColor" stroke-width="2.6"/></symbol>
+    <symbol id="i-cross" viewBox="0 0 18 18"><path d="M4 4l10 10M14 4L4 14" fill="none" stroke="currentColor" stroke-width="2.6"/></symbol>
+    <symbol id="i-download" viewBox="0 0 18 18"><path d="M9 2v9M5 8l4 4 4-4M3 15h12" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-link" viewBox="0 0 18 18"><path d="M7 11a3 3 0 0 0 4 0l3-3a3 3 0 0 0-4-4l-1 1M11 7a3 3 0 0 0-4 0l-3 3a3 3 0 0 0 4 4l1-1" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-warn" viewBox="0 0 16 16"><path d="M8 1.5 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 6v4M8 11.5v1" stroke="currentColor" stroke-width="1.6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 16 16"><rect x="5" y="5" width="9" height="9" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M11 5V3.5A1.5 1.5 0 0 0 9.5 2h-6A1.5 1.5 0 0 0 2 3.5v6A1.5 1.5 0 0 0 3.5 11H5" fill="none" stroke="currentColor" stroke-width="1.4"/></symbol>
+  </defs>
+</svg>
+
+<div class="page home">
+<header class="top"><a class="brand" href="./"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a><span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="calc">Calculadoras</span><span class="sub" data-i18n="homesub">hormigón armado · en tu navegador</span><span class="spacer"></span><nav><a href="#calcs" data-i18n="calc">Calculadoras</a><a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a><div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div></nav></header>
+<main class="calc">
+<section class="hero">
+  <div>
+    <div class="eyebrow" data-i18n="h_eye">Hormigón armado · ACI 318-19 · CIRSOC 201-25 · EN 1992</div>
+    <h1 class="t-h1" data-i18n="h1">Diseñá la armadura o verificá la tuya. Rápido, gratis y con la memoria lista.</h1>
+    <p class="lead" data-i18n="h1p">Cargás la sección y los esfuerzos; mento propone el armado, verifica flexión y corte por combinación y te deja la memoria en Word. Recalcula mientras escribís, en tu navegador.</p>
+    <div class="cta"><a href="beam/" class="btn" data-i18n="cta1">Abrí la viga rectangular →</a><a href="#calcs" class="btn btn--sec" data-i18n="cta2">Ver las calculadoras</a></div>
+    <div class="facts"><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_free">Gratis</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_test">Testeado contra ejemplos publicados</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_noreg">Sin registro</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_lang">Español e inglés</span></span></div>
+  </div>
+  <!-- The worked example of beam/ (py/beam.py EXAMPLE); py/test_home.py keeps these numbers in step with mento. -->
+  <div class="viz" aria-hidden="true">
+    <div class="viz-draw"><span class="eyebrow" data-i18n="drawing">Sección · a escala</span><svg width="272" height="290" viewBox="0 0 310 330" role="img" data-i18n-aria="fig_beam" aria-label="Sección 20 × 60 con su armadura">
+        <g transform="translate(70,10)"><rect class="dw-concrete" x="0" y="0" width="100" height="300"/>
+        <rect class="dw-stirrup" x="12.5" y="12.5" width="75" height="275" rx="5" style="stroke-width:3"/>
+        <circle class="dw-bar" cx="19" cy="281" r="4"/><circle class="dw-bar" cx="81" cy="281" r="4"/><circle class="dw-bar" cx="50" cy="282" r="3"/><circle class="dw-bar" cx="18.5" cy="18.5" r="3"/><circle class="dw-bar" cx="81.5" cy="18.5" r="3"/><circle class="dw-bar" cx="50" cy="18" r="2.5"/>
+        <line x1="84" y1="18.5" x2="130" y2="18.5" stroke="#5b6470" stroke-width=".8"/><text class="dw-label" x="134" y="22" font-size="14" data-hero="top">2Ø12 + 1Ø10</text>
+        <line x1="88" y1="150" x2="130" y2="150" stroke="#5b6470" stroke-width=".8"/><text class="dw-label dw-label--stirrup" x="134" y="154" font-size="14" data-hero="stirrups">1eØ6 c/13</text>
+        <line x1="84" y1="281" x2="130" y2="281" stroke="#5b6470" stroke-width=".8"/><text class="dw-label" x="134" y="285" font-size="14" data-hero="bottom">2Ø16 + 1Ø12</text>
+        <text class="dw-dim" x="-6" y="154" text-anchor="end" font-size="14" data-hero="section">20 × 60</text></g></svg></div>
+    <div class="viz-prop">
+      <div class="hd"><span class="eyebrow" data-i18n="propose_s">mento propone</span><span class="grp-name" data-i18n="bot_l">inferior</span></div>
+      <div class="opt is-selected"><span style="width:12px;height:12px;border-radius:50%;border:1.5px solid var(--brand-ink);display:inline-flex;align-items:center;justify-content:center"><i style="width:6px;height:6px;border-radius:50%;background:var(--brand-ink)"></i></span><span class="val" data-hero="opt1">2Ø16 + 1Ø12</span><span class="area">5.15 cm²</span><span class="dcr ok" data-hero="opt1_dcr">0.86</span></div>
+      <div class="opt"><span style="width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink-3)"></span><span class="val" data-hero="opt2">3Ø16</span><span class="area">6.03 cm²</span><span class="dcr ok" data-hero="opt2_dcr">0.74</span></div>
+      <div class="opt"><span style="width:12px;height:12px;border-radius:50%;border:1.5px solid var(--ink-3)"></span><span class="val" data-hero="opt3">2Ø20</span><span class="area">6.28 cm²</span><span class="dcr ok" data-hero="opt3_dcr">0.72</span></div>
+      <div class="more" data-i18n="ortry">o cargá la tuya y verificala →</div>
     </div>
-  </main>
-  <script>
-    // Download Python and mento while the visitor reads, so the calculator only has to start them.
-    const warm = () => { if (!navigator.connection?.saveData) new Worker("shared/worker.js?module=beam&prefetch=1"); };
-    "requestIdleCallback" in window ? requestIdleCallback(warm) : setTimeout(warm, 1);
-  </script>
+    <div class="viz-verdict">
+      <div class="word"><span class="mark"><svg width="14" height="14"><use href="#i-check"/></svg></span><span data-i18n="passes">Cumple</span><span class="readout" data-hero="dcr">0.86</span></div>
+      <div class="mini"><div><span data-i18n="fb_s">flexión inf.</span><div class="meter"><i style="width:86%"></i></div><span class="num mono" data-hero="bottom_dcr">0.86</span></div><div><span data-i18n="ft_s">flexión sup.</span><div class="meter"><i style="width:71%"></i></div><span class="num mono" data-hero="top_dcr">0.71</span></div><div><span data-i18n="sh_s">corte</span><div class="meter"><i style="width:81%"></i></div><span class="num mono" data-hero="shear_dcr">0.81</span></div></div>
+      <span class="sum-line" data-i18n="sumline">flexión 0.86 · corte 0.81</span>
+      <button class="btn" type="button" tabindex="-1"><svg width="14" height="14"><use href="#i-download"/></svg><span data-i18n="memdocx">Memoria .docx</span></button>
+    </div>
+  </div>
+</section>
+
+<section class="steps-band"><div class="eyebrow" data-i18n="how">Cómo funciona</div>
+  <div class="steps-row">
+    <div class="step"><span class="n">1</span><span class="t" data-i18n="s1t">Cargá la sección y los esfuerzos</span><span class="d" data-i18n="s1d">Norma, materiales, b × h y las combinaciones con M, V y N. Arranca con un ejemplo resuelto: cambiás lo tuyo y listo.</span></div>
+    <div class="step"><span class="n">2</span><span class="t" data-i18n="s2t">Elegí: que mento la diseñe, o verificá la tuya</span><span class="d" data-i18n="s2d">mento propone tres armados por grupo (inferior, superior, estribos) con su aprovechamiento. O cargás tus barras y las verificás.</span></div>
+    <div class="step"><span class="n">3</span><span class="t" data-i18n="s3t">Leé la verificación de un vistazo</span><span class="d" data-i18n="s3d">Cumple / no cumple por flexión y corte, con la combinación que gobierna, la tabla completa por combinación y el cálculo detallado.</span></div>
+    <div class="step"><span class="n">4</span><span class="t" data-i18n="s4t">Llevátelo</span><span class="d" data-i18n="s4d">Memoria en Word para tu informe y un link que guarda el diseño completo para compartirlo o retomarlo.</span></div>
+  </div></section>
+
+<section class="calcs" id="calcs">
+  <div class="head"><h2 class="t-h2" data-i18n="calc">Calculadoras</h2><span class="sub" data-i18n="calcsub">cada una con las tres normas adentro</span></div>
+  <div class="cgrid cgrid--home">
+    <a class="ccard ccard--featured" href="beam/"><div class="body"><div class="name" data-i18n="beam">Viga rectangular</div><div class="desc" data-i18n="c1">Flexión y corte con hasta 10 combinaciones, momento positivo y negativo, axil en corte. Diseño de armadura con tres opciones por grupo, o verificación de la tuya.</div><div class="codes">ACI 318-19 · CIRSOC 201-25 · EN 1992</div><div class="foot"><span class="tag" data-i18n="live">● Disponible</span><span class="go" data-i18n="openbeam">Abrí la viga →</span></div></div><div class="fig"><svg width="214" height="228" viewBox="0 0 310 330" role="img" data-i18n-aria="fig_beam" aria-label="Sección 20 × 60 con su armadura">
+        <g transform="translate(70,10)"><rect class="dw-concrete" x="0" y="0" width="100" height="300"/>
+        <rect class="dw-stirrup" x="12.5" y="12.5" width="75" height="275" rx="5" style="stroke-width:3"/>
+        <circle class="dw-bar" cx="19" cy="281" r="4"/><circle class="dw-bar" cx="81" cy="281" r="4"/><circle class="dw-bar" cx="50" cy="282" r="3"/><circle class="dw-bar" cx="18.5" cy="18.5" r="3"/><circle class="dw-bar" cx="81.5" cy="18.5" r="3"/><circle class="dw-bar" cx="50" cy="18" r="2.5"/>
+        <line x1="84" y1="18.5" x2="130" y2="18.5" stroke="#5b6470" stroke-width=".8"/><text class="dw-label" x="134" y="22" font-size="14">2Ø12 + 1Ø10</text>
+        <line x1="88" y1="150" x2="130" y2="150" stroke="#5b6470" stroke-width=".8"/><text class="dw-label dw-label--stirrup" x="134" y="154" font-size="14">1eØ6 c/13</text>
+        <line x1="84" y1="281" x2="130" y2="281" stroke="#5b6470" stroke-width=".8"/><text class="dw-label" x="134" y="285" font-size="14">2Ø16 + 1Ø12</text>
+        <text class="dw-dim" x="-6" y="154" text-anchor="end" font-size="14">20 × 60</text></g></svg></div></a>
+    <a class="ccard" href="slab/"><div class="head"><span class="fig"><svg viewBox="0 0 240 78" role="img" data-i18n-aria="fig_slab" aria-label="Franja de losa con su armadura">
+        <line class="dw-cut" x1="18" y1="14" x2="18" y2="70"/><line class="dw-cut" x1="222" y1="14" x2="222" y2="70"/>
+        <rect class="dw-concrete" x="18" y="24" width="204" height="36"/>
+        <circle class="dw-bar" cx="30" cy="53" r="3.4"/><circle class="dw-bar" cx="66" cy="53" r="3.4"/><circle class="dw-bar" cx="102" cy="53" r="3.4"/><circle class="dw-bar" cx="138" cy="53" r="3.4"/><circle class="dw-bar" cx="174" cy="53" r="3.4"/><circle class="dw-bar" cx="210" cy="53" r="3.4"/>
+        <circle class="dw-bar" cx="30" cy="31" r="2.6"/><circle class="dw-bar" cx="102" cy="31" r="2.6"/><circle class="dw-bar" cx="174" cy="31" r="2.6"/>
+      </svg></span><div><div class="name" data-i18n="slab">Losa en una dirección</div><div class="desc" data-i18n="c2">Flexión y corte en una franja del ancho que definís.</div></div></div><div class="foot"><span class="tag" data-i18n="live">● Disponible</span><span class="go" data-i18n="open">Abrí →</span></div></a>
+    <a class="ccard" href="wall/"><div class="head"><span class="fig"><svg viewBox="0 0 240 78" role="img" data-i18n-aria="fig_wall" aria-label="Sección de tabique con sus elementos de borde">
+        <rect class="dw-concrete" x="18" y="30" width="204" height="24"/>
+        <rect class="dw-stirrup" x="24" y="33" width="34" height="18" rx="3" style="stroke-width:1.2"/><rect class="dw-stirrup" x="182" y="33" width="34" height="18" rx="3" style="stroke-width:1.2"/>
+        <circle class="dw-bar" cx="29" cy="38" r="2.6"/><circle class="dw-bar" cx="29" cy="46" r="2.6"/><circle class="dw-bar" cx="53" cy="38" r="2.6"/><circle class="dw-bar" cx="53" cy="46" r="2.6"/><circle class="dw-bar" cx="187" cy="38" r="2.6"/><circle class="dw-bar" cx="187" cy="46" r="2.6"/><circle class="dw-bar" cx="211" cy="38" r="2.6"/><circle class="dw-bar" cx="211" cy="46" r="2.6"/>
+        <circle class="dw-bar" cx="86" cy="38" r="2.2"/><circle class="dw-bar" cx="86" cy="46" r="2.2"/><circle class="dw-bar" cx="120" cy="38" r="2.2"/><circle class="dw-bar" cx="120" cy="46" r="2.2"/><circle class="dw-bar" cx="154" cy="38" r="2.2"/><circle class="dw-bar" cx="154" cy="46" r="2.2"/>
+      </svg></span><div><div class="name" data-i18n="wall">Tabique</div><div class="desc" data-i18n="c3">Corte en el plano. Diseño de la malla o verificación de la tuya.</div></div></div><div class="foot"><span class="tag" data-i18n="live">● Disponible</span><span class="go" data-i18n="open">Abrí →</span></div></a>
+    <div class="soon-strip"><span class="eyebrow" data-i18n="soon2">En camino</span><span class="item"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="14" y="14" width="12" height="12" fill="#e9edf1" stroke="#6b7580"/><rect x="8" y="8" width="24" height="24" fill="none" stroke="#4890d2" stroke-width="1.6" stroke-dasharray="3 2"/></svg><span data-i18n="punch">Punzonado</span></span><span class="item"><svg viewBox="0 0 40 40" aria-hidden="true"><rect x="10" y="10" width="20" height="20" fill="#e9edf1" stroke="#6b7580"/><rect x="13" y="13" width="14" height="14" rx="2" fill="none" stroke="#4890d2" stroke-width="1.6"/></svg><span data-i18n="col">Columna</span></span><a href="https://github.com/mihdicaballero/mento/discussions" data-i18n="askone">¿Te falta otra? Pedila →</a></div>
+  </div>
+</section>
+
+<section class="band"><div class="band-grid">
+  <div><div class="big" id="tests" hidden></div><div class="lead-t" id="tests-t" data-i18n="tests_none">Testeado contra ejemplos publicados</div><div class="lead-d" data-i18n="tests_d">Cada rutina se compara con ejemplos resueltos de ACI 318, CIRSOC 201 y EN 1992, en cada cambio del código. Los tests son públicos.</div><a href="https://github.com/mihdicaballero/mento/tree/main/tests" style="font-size:13.5px;text-decoration:none" data-i18n="seetests">Verlos →</a></div>
+  <div class="band-cols">
+    <div><b data-i18n="p1t">Nada sale de tu dispositivo</b><span data-i18n="p1d">El cálculo corre en tu navegador. Sin servidor, sin cuenta. Después de la primera carga funciona sin conexión.</span></div>
+    <div><b data-i18n="p2t">Memoria en Word, no en PDF</b><span data-i18n="p2d">Un .docx editable con datos, tablas por combinación y cálculo detallado, para pegarlo en tu informe con tu formato.</span></div>
+    <div><b data-i18n="p3t">Todo a la vista</b><span data-i18n="p3d">Tablas por combinación, cálculo paso a paso y, si querés, el código Python que reproduce el resultado.</span></div>
+  </div></div></section>
+
+<section class="support">
+  <div><h2 class="t-h2" data-i18n="sup_t">mento es gratis y sin publicidad, y va a seguir así.</h2><p class="say" data-i18n="sup_d">Lo mantenemos en el tiempo que nos dejan los proyectos de la oficina. Si te ahorró una tarde, un café ayuda a que el proyecto siga vivo: hosting, horas de desarrollo y las calculadoras que faltan.</p>
+    <div class="donate"><a href="#" class="btn" data-link="kofi" data-i18n="kofi">Invitanos un café · Ko-fi</a><a href="#" class="btn btn--sec" data-link="cafecito" data-i18n="cafecito">Cafecito · Mercado Pago</a><a href="#" class="btn btn--sec" data-link="sponsors" data-i18n="sponsors">GitHub Sponsors</a></div>
+    <p class="fine" data-i18n="fine">Ko-fi acepta PayPal y tarjeta en dólares o euros · Cafecito en pesos · Sponsors si ya usás GitHub.</p></div>
+  <div class="also"><span class="eyebrow" data-i18n="also">También ayuda</span>
+    <div><b data-i18n="a1t">Verificá un resultado.</b> <span data-i18n="a1d">Compará con tu planilla o con un ejemplo de la norma y contanos si difiere. Cada caso confirmado entra a los tests.</span> <a href="https://github.com/mihdicaballero/mento/issues/new" style="text-decoration:none" data-i18n="a1l">Reportá una diferencia →</a></div>
+    <div><b data-i18n="a2t">Pedí lo que te falta.</b> <span data-i18n="a2d">Las calculadoras siguen al paquete: si mento lo calcula, acá aparece.</span> <a href="https://github.com/mihdicaballero/mento/discussions" style="text-decoration:none" data-i18n="a2l">Pedí una calculadora →</a></div>
+    <div><b data-i18n="a3t">Compartilo.</b> <span data-i18n="a3d">Un link a un diseño tuyo le muestra a un colega exactamente lo que hace.</span></div></div>
+</section>
+
+<section class="team"><div class="eyebrow" data-i18n="team">Quiénes lo hacen</div>
+  <div class="team-grid">
+    <div class="person"><span class="av"><img src="shared/team/mihdi.jpg" alt="" width="52" height="52"></span><div><div class="nm" data-i18n="nm1">Esp. Ing. Mihdí Caballero</div><div class="rl"><span data-i18n="r1">Creador de mento · ingeniero estructural</span><br><span data-i18n="r1b">Socio director, RAMÉ Ingeniería</span></div><div class="links"><a href="https://www.linkedin.com/in/mihdicaballero/">LinkedIn</a><a href="https://github.com/mihdicaballero">GitHub</a><a href="https://melodijouningeniero.com/">Me lo dijo un ingeniero</a></div></div></div>
+    <div class="person"><span class="av"><img src="shared/team/juan-pablo.jpg" alt="" width="52" height="52"></span><div><div class="nm" data-i18n="nm2">Ing. Juan Pablo Romaris</div><div class="rl"><span data-i18n="r2">Creador de mento · ingeniero estructural</span><br><span data-i18n="r2b">Universidad Tecnológica Nacional</span></div><div class="links"><a href="https://www.linkedin.com/in/juan-pablo-romaris-13ab4a173/">LinkedIn</a><a href="https://github.com/JuanPabloRomaris">GitHub</a></div></div></div>
+    <div class="about"><span data-i18n="about">mento nació de las planillas y scripts que usamos todos los días en la oficina para calcular hormigón. Los pasamos a un paquete de Python para poder testearlos, y a esta web para diseñar rápido sin instalar nada.</span><br><a href="https://forms.gle/QoDzczQToLa78jMo7" data-i18n="biz">Para empresas: herramientas a medida y capacitación →</a></div>
+  </div></section>
+
+<footer class="foot"><span data-i18n="footer">Herramienta de apoyo. La verificación final es responsabilidad del profesional.</span><span class="spacer"></span><span>mento <span id="version">1.2.0</span> · <span data-i18n="oss">Código abierto</span> · <a href="https://github.com/mihdicaballero/mento">GitHub</a> · <a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a> · <a href="https://github.com/mihdicaballero/mento/discussions" data-i18n="feedback">Contanos qué te pareció</a></span></footer>
+</main>
+</div>
+<script type="module" src="home.js"></script>
 </body>
 </html>

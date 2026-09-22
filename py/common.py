@@ -1,0 +1,342 @@
+"""What the three calculators share: materials, forces, tables, options and the Word report.
+
+Runs inside Pyodide in the browser, but has no Pyodide-specific code, so every calculator can
+be exercised from a normal interpreter.
+"""
+
+from __future__ import annotations
+
+import base64
+import contextlib
+import copy
+import io
+import math
+import os
+import tempfile
+from typing import Any, Callable
+
+import docx
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
+from mento import (
+    Concrete_ACI_318_19,
+    Concrete_CIRSOC_201_25,
+    Concrete_EN_1992_2004,
+    Forces,
+    MPa,
+    SteelBar,
+    kN,
+    kNm,
+)
+
+CONCRETES = {
+    "ACI 318-19": Concrete_ACI_318_19,
+    "CIRSOC 201-25": Concrete_CIRSOC_201_25,
+    "EN 1992-2004": Concrete_EN_1992_2004,
+}
+# ØMn under ACI and CIRSOC, MRd under EN: the symbol belongs to the code the user picked.
+CAPACITY = {"EN 1992-2004": {"M": "MRd", "V": "VRd"}}
+DEFAULT_CAPACITY = {"M": "ØMn", "V": "ØVn"}
+# The bar catalogue the page offers as alternatives, in mm.
+DIAMETERS = [6, 8, 10, 12, 16, 20, 25]
+
+
+class InputError(ValueError):
+    """A problem with what the user typed, reported back by field name."""
+
+    def __init__(self, field: str, message: str) -> None:
+        super().__init__(message)
+        self.field = field
+
+
+def number(data: dict[str, Any], key: str, *, positive: bool = True) -> float:
+    try:
+        value = float(data.get(key))  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        raise InputError(key, "missing") from None
+    if math.isnan(value) or (positive and value <= 0):
+        raise InputError(key, "positive")
+    return value
+
+
+def quantity(value: Any, unit: str, precision: int = 2) -> str | None:
+    if value is None:
+        return None
+    return f"{value.to(unit):.{precision}f~P}"
+
+
+def magnitude(value: Any, unit: str, precision: int = 1) -> float | None:
+    return None if value is None else round(float(value.to(unit).magnitude), precision)
+
+
+def materials(data: dict[str, Any]) -> tuple[Any, SteelBar]:
+    code = data.get("code")
+    if code not in CONCRETES:
+        raise InputError("code", "unknown")
+    f_c = number(data, "fc")
+    f_y = number(data, "fy")
+    return CONCRETES[code](name=f"f'c {f_c:g}", f_c=f_c * MPa), SteelBar(name=f"fy {f_y:g}", f_y=f_y * MPa)
+
+
+def build_forces(data: dict[str, Any]) -> list[Forces]:
+    forces = []
+    for index, row in enumerate(data.get("forces") or []):
+        m_y = float(row.get("M_y") or 0)
+        v_z = float(row.get("V_z") or 0)
+        n_x = float(row.get("N_x") or 0)
+        if m_y == 0 and v_z == 0 and n_x == 0:
+            continue
+        forces.append(Forces(label=str(row.get("label") or f"C{index + 1}"), M_y=m_y * kNm, V_z=v_z * kN, N_x=n_x * kN))
+    if not forces:
+        raise InputError("forces", "empty")
+    return forces
+
+
+def label_of(data: dict[str, Any], default: str) -> str:
+    return str(data.get("label") or default)
+
+
+# ------------------------------------------------------------------------ tables and text
+
+
+def cell(value: Any) -> str:
+    if value is None or (isinstance(value, float) and math.isnan(value)):
+        return "–"
+    if isinstance(value, bool):
+        return "✓" if value else "✕"
+    if isinstance(value, float):
+        return f"{value:.2f}"
+    return str(value)
+
+
+def table(frame: Any) -> dict[str, Any]:
+    """mento's DataFrame as it prints it: same columns, same order, its units row in the header."""
+    columns = [str(name) for name in frame.columns]
+    rows = [[cell(value) for value in row] for row in frame.itertuples(index=False)]
+    # mento puts the units in the first row, under an empty label
+    units = rows.pop(0) if rows and not rows[0][0].strip() else [""] * len(columns)
+    return {"columns": columns, "units": units, "rows": rows, "dcr": columns.index("DCR") if "DCR" in columns else None}
+
+
+def printed(*calls: Callable[[], Any]) -> str:
+    """What mento prints, captured: it writes its detailed results to stdout."""
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+        for write in calls:
+            write()
+    return out.getvalue()
+
+
+def row_value(frame: Any, index: int, column: str) -> Any:
+    """One cell of a mento results table, skipping its units row."""
+    return frame.iloc[index + 1][column]
+
+
+# ------------------------------------------------------------------------ design options
+
+
+def select(options: dict[str, list[dict[str, Any]]], choice: dict[str, Any]) -> tuple[dict[str, int], list[str]]:
+    """Keep the option the user picked if the new proposal still has it; otherwise fall back to
+    mento's own and say which groups changed, so the page can flag them (5.4)."""
+    selected: dict[str, int] = {}
+    changed: list[str] = []
+    for group, group_options in options.items():
+        signatures = [option["signature"] for option in group_options]
+        wanted = choice.get(group)
+        if wanted in signatures:
+            selected[group] = signatures.index(wanted)
+        else:
+            selected[group] = 0
+            if wanted:
+                changed.append(group)
+    return selected, changed
+
+
+def selected_layout(options: dict[str, Any], group: str, selected: dict[str, int]) -> dict[str, Any]:
+    group_options = options.get(group) or [{}]
+    return group_options[min(selected.get(group, 0), len(group_options) - 1)].get("layout", {})
+
+
+def fill_option_dcrs(
+    options: dict[str, Any],
+    selected: dict[str, int],
+    current: dict[str, float],
+    evaluate: Callable[[dict[str, Any], str], float],
+) -> None:
+    """The DCR beside an option is that option's, with the rest of the section as it stands."""
+    for group, group_options in options.items():
+        for index, option in enumerate(group_options):
+            if index == selected.get(group, 0):
+                option["dcr"] = current.get(group)
+                continue
+            layouts = {name: selected_layout(options, name, selected) for name in options}
+            layouts[group] = option["layout"]
+            option["dcr"] = evaluate(layouts, group)
+
+
+def spacing_options(
+    area_required: float,
+    chosen: dict[str, Any],
+    limit: int,
+    max_spacing: float,
+    min_spacing: float = 10.0,
+) -> list[dict[str, Any]]:
+    """Mesh layouts of one bar diameter at a spacing, mento's own pick first.
+
+    mento designs a mesh but keeps no ranked list of the others, and the spacing it derives from
+    a bar count is private, so the alternatives are built here: for each diameter, the widest
+    whole-centimetre spacing that still provides ``area_required`` (cm²/m), capped by the code's
+    limit. Every one of them is then checked by mento like any other reinforcement.
+    """
+    layouts = [chosen] if chosen else []
+    # One alternative per diameter: the same bar at a slightly different spacing is not a choice.
+    seen_diameters = {(chosen or {}).get("d")}
+    for diameter in DIAMETERS:
+        if diameter in seen_diameters:
+            continue
+        bar = math.pi * diameter**2 / 4 / 100  # cm² of one bar
+        if area_required <= 0:
+            continue
+        spacing = math.floor(min(bar / area_required * 100, max_spacing))
+        if spacing < min_spacing:
+            continue
+        seen_diameters.add(diameter)
+        layouts.append({"d": float(diameter), "s": float(spacing)})
+    ordered = layouts[:1] + sorted(layouts[1:], key=lambda item: abs(item["d"] - (chosen or {}).get("d", 10)))
+    return ordered[:limit]
+
+
+def signature(layout: dict[str, Any]) -> str:
+    """Short, stable name of a layout: what the URL keeps and what re-picks it after a recalc."""
+    if "s" in layout and "n" in layout:  # stirrups: count, diameter and spacing
+        return f"{layout['n']:g}x{layout['d']:g}@{layout['s']:g}"
+    if "s" in layout:  # a mesh: diameter at a spacing
+        return f"{layout['d']:g}@{layout['s']:g}"
+    return "+".join(f"{layout[f'n{i}']:g}x{layout[f'd{i}']:g}" for i in range(1, 5) if layout.get(f"n{i}"))
+
+
+def mesh_bars(layout: dict[str, Any]) -> str:
+    return "" if not layout else f"Ø{layout['d']:g} c/{layout['s']:g} cm"
+
+
+def mesh_area(layout: dict[str, Any], curtains: int = 1) -> str:
+    """The steel a mesh puts in, per metre. A wall carries one curtain on each face."""
+    if not layout:
+        return ""
+    return f"{curtains * math.pi * layout['d'] ** 2 / 4 / 100 * (100 / layout['s']):.2f} cm²/m"
+
+
+# ------------------------------------------------------------------------ notices
+
+
+def below(value: Any, limit: Any, slack: float = 0.999) -> bool:
+    if value is None or limit is None:
+        return False
+    return float(value.to(limit.units).magnitude) < float(limit.magnitude) * slack
+
+
+def face_notices(faces: list[tuple[Any, str]], captured: list[Any]) -> list[dict[str, Any]]:
+    """What mento flags about detailing: everything it raises as a warning, plus the minimums and
+    maximums its public results expose. mento has no structured warning list yet, so the codes are
+    named here and the page writes the sentence."""
+    notices = [{"code": "mento", "values": {"message": str(item.message)}} for item in captured]
+    for face, name in faces:
+        if below(face.A_s, face.A_s_min):
+            notices.append(
+                {
+                    "code": "as_below_min",
+                    "values": {
+                        "face": name,
+                        "A_s": quantity(face.A_s, "cm**2"),
+                        "limit": quantity(face.A_s_min, "cm**2"),
+                    },
+                }
+            )
+        if face.A_s_max is not None and below(face.A_s_max, face.A_s, 1.0):
+            notices.append(
+                {
+                    "code": "as_above_max",
+                    "values": {
+                        "face": name,
+                        "A_s": quantity(face.A_s, "cm**2"),
+                        "limit": quantity(face.A_s_max, "cm**2"),
+                    },
+                }
+            )
+    return notices
+
+
+# ------------------------------------------------------------------------ the Word report
+
+
+def _is_empty_paragraph(element: Any) -> bool:
+    return (
+        element.tag == qn("w:p")
+        and not any((node.text or "").strip() for node in element.iter(qn("w:t")))
+        and not any(True for _ in element.iter(qn("w:drawing")))
+    )
+
+
+def _starts_new_page(paragraph: Any) -> None:
+    """Mark a paragraph to start a page, in the place the schema wants it inside w:pPr."""
+    properties = paragraph.find(qn("w:pPr"))
+    if properties is None:
+        properties = OxmlElement("w:pPr")
+        paragraph.insert(0, properties)
+    if properties.find(qn("w:pageBreakBefore")) is not None:
+        return
+    # w:pageBreakBefore goes after w:pStyle, w:keepNext and w:keepLines, before everything else
+    position = sum(1 for child in properties if child.tag in {qn("w:pStyle"), qn("w:keepNext"), qn("w:keepLines")})
+    properties.insert(position, OxmlElement("w:pageBreakBefore"))
+
+
+def merge_documents(paths: list[str]) -> bytes:
+    """One Word file out of several: each extra document starts on a new page of the first.
+
+    mento ends each document with a table and an empty paragraph after it. With a page break
+    added after that, a table that fills its page pushes the empty paragraph onto the next one and
+    the break then opens another: a blank page. So the empty tail goes, and the next document's
+    title carries the break itself (pageBreakBefore), which can never leave a page empty.
+    """
+    merged = docx.Document(paths[0])
+    body = merged.element.body
+    for path in paths[1:]:
+        # the section properties, which must stay last, and the empty paragraphs before them
+        while len(body) > 1 and _is_empty_paragraph(body[-2]):
+            body.remove(body[-2])
+        elements = [element for element in docx.Document(path).element.body if element.tag != qn("w:sectPr")]
+        for index, element in enumerate(elements):
+            copied = copy.deepcopy(element)
+            if index == 0 and copied.tag == qn("w:p"):
+                _starts_new_page(copied)
+            body[-1].addprevious(copied)
+    buffer = io.BytesIO()
+    merged.save(buffer)
+    return buffer.getvalue()
+
+
+def write_report(writers: list[Callable[[], Any]], name: str) -> str:
+    """Run mento's document writers in a scratch folder and hand the file back as base64."""
+    previous = os.getcwd()
+    with tempfile.TemporaryDirectory() as folder:
+        os.chdir(folder)
+        try:
+            paths: list[str] = []
+            # mento writes one file per check, named in the report language.
+            for write in writers:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    write()
+                paths += [
+                    os.path.join(folder, found)
+                    for found in sorted(os.listdir(folder))
+                    if found not in map(os.path.basename, paths)
+                ]
+            content = merge_documents(paths)
+        finally:
+            os.chdir(previous)
+    return base64.b64encode(content).decode("ascii")
+
+
+def safe_label(label: str) -> str:
+    """mento puts the label in the names of the files it writes, so it has to be a valid one."""
+    return "".join("_" if char in r'\/:*?"<>|' else char for char in label)
