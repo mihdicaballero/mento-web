@@ -27,6 +27,7 @@ fetch("shared/stats.json", { cache: "no-cache" })
   })
   .catch(() => { /* no stats yet */ });
 
-// Download Python and mento while the visitor reads, so the calculator only has to start them.
+// Download, install and compile Python and mento while the visitor reads, and save the result
+// (see the saved environment in shared/worker.js), so the calculator only has to start them.
 const warm = () => { if (!navigator.connection?.saveData) new Worker("shared/worker.js?module=beam&prefetch=1"); };
 "requestIdleCallback" in window ? requestIdleCallback(warm) : setTimeout(warm, 1);

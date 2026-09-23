@@ -1,13 +1,16 @@
 // Runs Python (Pyodide) and mento off the main thread, so the page never freezes.
 // Each calculator starts it as `worker.js?module=<name>`, which loads `py/<name>.py`.
 // A glue module exposes run(json) -> json, report(json) -> json and an EXAMPLE dict.
-// With `&prefetch=1` (the home page) it only downloads everything into the browser cache and quits.
+// With `&prefetch=1` (the home page) it builds the saved environment (below) if there is none, and quits.
 // Protocol: {id, type: "run" | "report", payload} -> {id, ok, result | error}
 // plus unsolicited {type: "progress", step} and {type: "ready", version} on startup.
 
 const PYODIDE_VERSION = "0.29.5";
 const MENTO_VERSION = "1.2.0";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+const PYODIDE_PACKAGES = ["numpy", "pandas", "jinja2", "lxml"];
+// mento 1.2.0 predates pint 0.26; the cap goes away with the next mento release.
+const PYPI_PACKAGES = ["pint<0.26", "tabulate", "python-docx"];
 
 const MODULE = new URL(self.location.href).searchParams.get("module");
 if (!/^[a-z_]+$/.test(MODULE || "")) throw new Error(`Unknown calculator module: ${MODULE}`);
@@ -67,26 +70,112 @@ sys.modules["IPython"] = ipython
 sys.modules["IPython.display"] = display
 `;
 
-async function boot() {
+// The saved environment. Downloads come from the HTTP cache after the first visit, but two costs
+// came back on every one: micropip asking PyPI what to install, and Python compiling each module it
+// imports (pandas, mento, pint...) because Pyodide keeps no __pycache__ between visits, ~2 s on a
+// desktop and three times that on a phone. So the first boot saves in Cache Storage, as a tar,
+// everything it added to site-packages after the Pyodide packages: the PyPI packages, the bytecode
+// of every module imported, and pint's parsed unit definitions. Later boots unpack it and skip
+// micropip, PyPI and the compiler. The key carries every version, so a new mento (or Pyodide, or
+// package list) misses, rebuilds, and the old entry is deleted.
+const ENV_CACHE = "mento-env";
+const ENV_KEY = new URL(
+  `../mento-env/${PYODIDE_VERSION}/${MENTO_VERSION}/${encodeURIComponent(PYPI_PACKAGES.join(" "))}.tar`,
+  self.location.href,
+).href;
+
+const ENV = `
+import os, sys, sysconfig, tarfile, time
+
+SITE = sysconfig.get_path("purelib")
+PINT_CACHE = os.path.join(SITE, "_pint_cache")
+
+def env_start():
+    """Before installing: note the time, and let imports write their bytecode."""
+    sys.dont_write_bytecode = False
+    return time.time()
+
+def env_pint_cache():
+    """mento builds UnitRegistry(system="mks"); keep pint's parsed definitions with the rest."""
+    import pint
+    os.makedirs(PINT_CACHE, exist_ok=True)
+    init = pint.UnitRegistry.__init__
+    def cached(self, *args, **kwargs):
+        kwargs.setdefault("cache_folder", PINT_CACHE)
+        init(self, *args, **kwargs)
+    pint.UnitRegistry.__init__ = cached
+
+def env_pack(since, path):
+    """Tar what changed in site-packages since env_start(), with every .pyc made unchecked."""
+    import compileall, py_compile
+    # What the other calculators import lazily from mento, compiled now so it is saved too.
+    compileall.compile_dir(os.path.join(SITE, "mento"), quiet=2,
+                           invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
+    with tarfile.open(path, "w") as tar:
+        for root, _, files in os.walk(SITE):
+            for name in files:
+                full = os.path.join(root, name)
+                if os.stat(full).st_mtime < since:
+                    continue
+                if name.endswith(".pyc"):
+                    # Imports write the source's mtime into the header, and Pyodide re-extracts
+                    # pandas with a new one on every visit. Flags = 1 (PEP 552): hash-based,
+                    # never checked, so the bytecode stays valid; the key already versions it.
+                    with open(full, "r+b") as f:
+                        f.seek(4)
+                        f.write((1).to_bytes(4, "little"))
+                tar.add(full, arcname=os.path.relpath(full, SITE))
+
+def env_unpack(path):
+    with tarfile.open(path) as tar:
+        tar.extractall(SITE, filter="tar")
+`;
+
+async function readEnv() {
+  try {
+    const response = await (await caches.open(ENV_CACHE)).match(ENV_KEY);
+    return response ? new Uint8Array(await response.arrayBuffer()) : null;
+  } catch {
+    return null;  // no Cache Storage (private mode, file://): boot the long way
+  }
+}
+
+async function saveEnv(pyodide, since) {
+  try {
+    pyodide.globals.get("env_pack")(since, "/tmp/env.tar");
+    const cache = await caches.open(ENV_CACHE);
+    await cache.put(ENV_KEY, new Response(pyodide.FS.readFile("/tmp/env.tar"), {
+      headers: { "Content-Type": "application/x-tar" },
+    }));
+    for (const request of await cache.keys()) if (request.url !== ENV_KEY) await cache.delete(request);
+  } catch (error) {
+    console.warn("mento: could not save the environment", error);
+  }
+}
+
+async function boot(saved) {
   progress("python");
   const pyodide = await loadPyodide({ indexURL: PYODIDE_URL });
 
   progress("packages");
-  await pyodide.loadPackage(["numpy", "pandas", "jinja2", "lxml", "micropip"]);
+  await pyodide.loadPackage(saved ? PYODIDE_PACKAGES : [...PYODIDE_PACKAGES, "micropip"]);
+  pyodide.runPython(ENV);
 
   progress("mento");
-  const micropip = pyodide.pyimport("micropip");
-  // mento 1.2.0 predates pint 0.26; the cap goes away with the next mento release.
-  await micropip.install(["pint<0.26", "tabulate", "python-docx"]);
-  await micropip.install.callKwargs([`mento==${MENTO_VERSION}`], { deps: false });
-
-  if (PREFETCH) {
-    await Promise.all(["common", MODULE].map((name) => fetch(new URL(`../py/${name}.py`, self.location.href))));
-    return null;
+  let since = null;
+  if (saved) {
+    pyodide.FS.writeFile("/tmp/env.tar", saved);
+    pyodide.globals.get("env_unpack")("/tmp/env.tar");
+  } else {
+    since = pyodide.globals.get("env_start")();
+    const micropip = pyodide.pyimport("micropip");
+    await micropip.install(PYPI_PACKAGES);
+    await micropip.install.callKwargs([`mento==${MENTO_VERSION}`], { deps: false });
   }
 
   progress("warmup");
   pyodide.runPython(STUBS);
+  pyodide.globals.get("env_pint_cache")();
   // py/common.py holds what the calculators share, so it travels with every one of them.
   for (const name of ["common", MODULE]) {
     // Revalidated every time: a glue module a release older than the page breaks the import.
@@ -95,16 +184,37 @@ async function boot() {
     pyodide.FS.writeFile(`/home/pyodide/${name}.py`, await response.text());
   }
   const api = pyodide.pyimport(MODULE);
-  // First call pays for mento's lazy imports; do it before the user asks.
-  api.run(JSON.stringify(api.EXAMPLE.toJs({ dict_converter: Object.fromEntries })));
-  return api;
+  // The first call imports what mento loads lazily. On a first boot it runs here, so those modules
+  // are compiled before the tar is made; with a saved environment they load as fast as the rest,
+  // and running the example here would only put a second calculation before the page's own.
+  if (!saved) api.run(JSON.stringify(api.EXAMPLE.toJs({ dict_converter: Object.fromEntries })));
+  return { api, save: since === null ? null : () => saveEnv(pyodide, since) };
 }
 
-const apiPromise = boot().then(
-  (api) => {
-    if (PREFETCH) return self.close();
+async function start() {
+  const saved = await readEnv();
+  if (saved && PREFETCH) return null;
+  if (!saved) return boot(null);
+  try {
+    return await boot(saved);
+  } catch (error) {
+    // A saved environment that no longer boots is dropped and rebuilt, not shown as an error.
+    console.warn("mento: saved environment failed, rebuilding", error);
+    await caches.open(ENV_CACHE).then((cache) => cache.delete(ENV_KEY)).catch(() => {});
+    return boot(null);
+  }
+}
+
+const apiPromise = start().then(
+  async (booted) => {
+    if (PREFETCH) {
+      await booted?.save?.();
+      return self.close();
+    }
     self.postMessage({ type: "ready", version: MENTO_VERSION });
-    return api;
+    // After "ready", so the first visit does not wait for it; the first run queues behind the tar.
+    booted.save?.();
+    return booted.api;
   },
   (error) => {
     self.postMessage({ type: "fatal", error: String(error) });

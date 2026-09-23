@@ -173,7 +173,7 @@ export async function start(spec) {
   }
 
   setInterval(() => {
-    if (ready) return;
+    if (ready || lastResult) return;
     $("elapsed").textContent = `${Math.round((Date.now() - started) / 1000)} s`;
     $("strip").querySelector(".readout").textContent = $("elapsed").textContent;
   }, 500);
@@ -194,7 +194,7 @@ export async function start(spec) {
     renderPython();
     if (!validate()) return;
     writeHash();
-    if (!ready) return;
+    if (!ready) return markStale();  // a saved result on screen no longer answers these inputs
     clearTimeout(timer);
     timer = setTimeout(calculate, now ? 0 : 250);
   }
@@ -203,9 +203,10 @@ export async function start(spec) {
     const mine = version;
     clearTimeout(staleTimer);
     staleTimer = setTimeout(() => { if (applied !== mine) markStale(); }, 150);
+    const sent = payload();
     let result;
     try {
-      result = await call("run", payload());
+      result = await call("run", sent);
     } catch (error) {
       result = { ok: false, kind: "mento", message: error.message };
     }
@@ -213,6 +214,29 @@ export async function start(spec) {
     clearTimeout(staleTimer);
     applied = mine;
     render(result);
+    if (result.ok) saveResult(sent, result);
+  }
+
+  // ------------------------------------------------------------ saved result
+  // Even with everything cached, Python takes seconds to start. So each calculator keeps its last
+  // result next to the exact payload it answers: a visit that asks the same shows it at once, and
+  // the worker recalculates and replaces it when ready (a newer mento may say something else).
+  const SAVED_KEY = `mento-${spec.module}-result`;
+
+  function saveResult(sent, result) {
+    try { localStorage.setItem(SAVED_KEY, JSON.stringify({ payload: JSON.stringify(sent), result })); } catch { /* storage blocked */ }
+  }
+
+  function showSaved() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_KEY));
+      if (saved?.payload !== JSON.stringify(payload()) || !saved.result?.ok) return;
+      applied = version;
+      render(saved.result);
+    } catch {
+      // Storage blocked, or a result shaped by an older release of the page: Python will answer.
+      try { localStorage.removeItem(SAVED_KEY); } catch { /* storage blocked */ }
+    }
   }
 
   function payload() {
@@ -615,4 +639,5 @@ export async function start(spec) {
   validate();
   renderPython();
   showStep("python");
+  if (!ready) showSaved();
 }

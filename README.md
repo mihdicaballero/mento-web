@@ -62,6 +62,16 @@ drop it with the next bump.
 mento imports `IPython` only to render Markdown in notebooks, so the worker registers a stub
 instead of downloading it (~10 MB saved).
 
+The first visit installs mento with micropip and saves the result in the browser's Cache Storage:
+the PyPI packages plus the bytecode of every module imported, as one tar. Later visits unpack it
+and skip PyPI and the compiler, ~2 s less on a desktop. The cache key carries the Pyodide and
+mento versions and the package list, so a bump rebuilds it once and deletes the old one. The home
+page builds it in the background. To start from scratch, clear the site data in the browser.
+
+Python still takes a few seconds to start, so each calculator also keeps its last result in
+`localStorage` with the exact inputs it answers. A visit with the same inputs shows it at once
+and Python replaces it when ready; an edit before then greys it out as "recalculating".
+
 ## Deploy
 
 Any static host. On Vercel: import the repo, framework preset **Other**, no build command,
