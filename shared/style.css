@@ -319,6 +319,9 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .band .lead-t{font-size:var(--fs-15);font-weight:600;margin-top:10px} .band .lead-d{font-size:13.5px;color:var(--ink-2);line-height:1.55;margin-top:6px}
 .band-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;font-size:13.5px;line-height:1.55;color:var(--ink-2)}
 .band-cols b{display:block;color:var(--ink);font-weight:600}
+/* mento in Python and help beyond it: their side padding sits here, before the 1360 px centering
+   below; declared after it, the shorthand overrode it and the two sections ran flush left */
+.pysec,.further{padding:48px var(--s-6) 0}
 /* support */
 .support{padding:48px var(--s-6) 0;display:grid;grid-template-columns:1.1fr 1fr;gap:56px}
 .support .t-h2{font-size:var(--fs-22);letter-spacing:-.01em;line-height:1.25}
@@ -456,7 +459,7 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 .proof b{color:var(--ink);font-size:var(--fs-14);font-weight:600}
 .band .band-cols{margin-top:28px;padding-top:24px;border-top:var(--bw) solid var(--brand-line)}
 /* mento in Python */
-.pysec{padding:48px var(--s-6) 0;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:48px;align-items:start}
+.pysec{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:48px;align-items:start}
 .pysec .t-h2{font-size:var(--fs-22);letter-spacing:-.01em;line-height:1.25;margin-top:var(--s-2)}
 .pysec .say{font-size:var(--fs-14);line-height:1.6;color:var(--ink-2);margin:12px 0 0}
 .ladder{list-style:none;margin:18px 0 0;padding:0}
@@ -475,7 +478,6 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 .pyout .mk{margin-left:6px;vertical-align:-1px}
 .pyout .hint{margin:10px var(--s-4) 0}
 /* help beyond the package: firms and the course */
-.further{padding:48px var(--s-6) 0}
 .further .head{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap} .further .head .t-h2{font-size:var(--fs-22);letter-spacing:-.01em} .further .fu-sub{margin:0;font-size:var(--fs-13);line-height:1.5;color:var(--ink-2)}
 .further-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;margin-top:14px}
 .fcard{display:flex;flex-direction:column;gap:10px;padding:22px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2)}
