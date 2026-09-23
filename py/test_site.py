@@ -5,7 +5,10 @@ import re
 from html.parser import HTMLParser
 from pathlib import Path
 
+import mento
+import pandas as pd
 import pytest
+from mento import BeamSummary, Concrete_ACI_318_19, MPa, SteelBar
 
 import beam
 
@@ -45,6 +48,7 @@ class _Strings(HTMLParser):
         self._open.append((tag, values.get("data-i18n"), []))
         inherited = bool(self._covered and self._covered[-1])
         covered = tag in ("svg", "script", "style", "title") or "data-i18n" in values or "data-i18n-html" in values
+        covered = covered or values.get("translate") == "no"  # code: its comments carry their own data-i18n
         self._covered.append(inherited or covered)
 
     def handle_data(self, data: str) -> None:
@@ -102,10 +106,11 @@ def test_no_ui_text_outside_the_dictionary(page):
     # API names (node.check_flexure(), pip install mento) are code, not copy: the design system
     # puts them in the disclosure headers exactly as mento spells them.
     api = re.compile(r"(node|beam|slab|wall)(_1)?\.\w+(\(\))?|pip install mento")
+    beams = re.compile(r"V\d{3}")  # element labels, as in an Excel of beams
     loose = {
         text
         for text in _parse(page).loose
-        if text not in names and not NOTATION.fullmatch(text) and not api.fullmatch(text)
+        if text not in names and not NOTATION.fullmatch(text) and not api.fullmatch(text) and not beams.fullmatch(text)
     }
     assert loose == set()
 
@@ -136,6 +141,58 @@ def test_hero_shows_the_worked_example():
     assert 0.7 <= min(bottom["DCR"], top["DCR"], shear["DCR"]) and governing <= 0.9
     es = _strings("home")["es"]
     assert es["sumline"] == f"flexión {max(bottom['DCR'], top['DCR']):.2f} · corte {shear['DCR']:.2f}"
+
+
+# The four beams of mento's user guide (BeamSummary), a units row first as the Excel carries it.
+GUIDE_BEAMS = {
+    "Label": ["", "V101", "V102", "V103", "V104"],
+    "Comb.": ["", "ELU 1", "ELU 2", "ELU 3", "ELU 4"],
+    "b": ["cm", 20, 20, 20, 20],
+    "h": ["cm", 50, 50, 50, 50],
+    "cc": ["mm", 25, 25, 25, 25],
+    "Nx": ["kN", 0, 0, 0, 0],
+    "Vz": ["kN", 20, -50, 100, 100],
+    "My": ["kNm", 0, -35, 40, 45],
+    "ns": ["", 0, 1, 1, 1],
+    "dbs": ["mm", 0, 6, 6, 6],
+    "sl": ["cm", 0, 20, 20, 20],
+    "n1": ["", 2, 2, 2, 2],
+    "db1": ["mm", 12, 12, 12, 12],
+    "n2": ["", 1, 1, 1, 0],
+    "db2": ["mm", 10, 16, 10, 0],
+    "n3": ["", 2, 0, 2, 0],
+    "db3": ["mm", 12, 0, 16, 0],
+    "n4": ["", 0, 0, 0, 0],
+    "db4": ["mm", 0, 0, 0, 0],
+}
+
+
+def test_python_section_shows_what_beam_summary_returns():
+    """The table under the notebook: the governing DCR of each beam with its rebar, then after design()."""
+    conc = Concrete_ACI_318_19(name="H-25", f_c=25 * MPa)
+    steel = SteelBar(name="ADN 420", f_y=420 * MPa)
+    summary = BeamSummary(conc, steel, pd.DataFrame(GUIDE_BEAMS))
+
+    def governing() -> dict[str, float]:
+        rows = summary.check().iloc[1:]  # the first row holds the units
+        return {row["Beam"]: max(row["DCRb,top"], row["DCRb,bot"], row["DCRv"]) for _, row in rows.iterrows()}
+
+    # the glue leaves mento in the language of the last report; the columns are read in English
+    previous = mento.get_language()
+    mento.set_language("en")
+    try:
+        checked = governing()
+        summary.design()
+        designed = governing()
+    finally:
+        mento.set_language(previous)
+    shown = dict(re.findall(r'data-sum="(V\d+ \w+)">([^<]*)<', PAGES["home"].read_text(encoding="utf-8")))
+    expected = {f"{label} check": f"{dcr:.2f}" for label, dcr in checked.items()}
+    expected |= {f"{label} design": f"{dcr:.2f}" for label, dcr in designed.items()}
+    assert shown == expected
+    # the story the table tells: two beams fail as drawn, all pass once mento designs them
+    assert sorted(label for label, dcr in checked.items() if dcr > 1) == ["V103", "V104"]
+    assert max(designed.values()) <= 1
 
 
 @pytest.mark.parametrize("page", ["slab", "wall"])

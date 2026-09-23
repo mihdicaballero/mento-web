@@ -26,7 +26,7 @@
 </svg>
 
 <div class="page home">
-<header class="top"><a class="brand" href="./"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a><span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="calc">Calculadoras</span><span class="sub" data-i18n="homesub">hormigón armado · en tu navegador</span><span class="spacer"></span><nav><a href="#calcs" data-i18n="calc">Calculadoras</a><a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a><div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div></nav></header>
+<header class="top"><a class="brand" href="./"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a><span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="calc">Calculadoras</span><span class="sub" data-i18n="homesub">hormigón armado · en tu navegador</span><span class="spacer"></span><nav><a href="#calcs" data-i18n="calc">Calculadoras</a><a href="#python" data-i18n="nav_py">Python</a><a href="#firms" class="nav-firms" data-i18n="nav_biz">Empresas</a><a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a><div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div></nav></header>
 <main class="calc">
 <section class="hero">
   <div>
@@ -97,13 +97,92 @@
   </div>
 </section>
 
-<section class="band"><div class="band-grid">
+<section class="band" id="trust"><div class="band-grid">
   <div><div class="big" id="tests" hidden></div><div class="lead-t" id="tests-t" data-i18n="tests_none">Testeado contra ejemplos publicados</div><div class="lead-d" data-i18n="tests_d">Cada rutina se compara con ejemplos resueltos de ACI 318, CIRSOC 201 y EN 1992, en cada cambio del código. Los tests son públicos.</div><a href="https://github.com/mihdicaballero/mento/tree/main/tests" style="font-size:13.5px;text-decoration:none" data-i18n="seetests">Verlos →</a></div>
+  <div><div class="eyebrow" data-i18n="v_eye">Cómo entra un cálculo a mento</div>
+    <ol class="vsteps">
+      <li><span class="n">1</span><div><b data-i18n="v1t">Un ejemplo publicado</b><span data-i18n="v1d">De la norma, de una guía oficial o de un libro reconocido.</span></div></li>
+      <li><span class="n">2</span><div><b data-i18n="v2t">Resuelto fuera de mento</b><span data-i18n="v2d">En una hoja de CalcPad con unidades, que se sigue sin leer una línea de código.</span></div></li>
+      <li><span class="n">3</span><div><b data-i18n="v3t">Un test que lo vigila</b><span data-i18n="v3d">Nombra su fuente y corre en cada cambio. Si el resultado se mueve, el cambio no entra.</span></div></li>
+    </ol></div>
+  </div>
+  <ul class="proof">
+    <li><a href="https://pypi.org/project/mento/"><b data-i18n="pr1t">+1.000 descargas por mes</b><span data-i18n="pr1d">en PyPI, el índice de paquetes de Python</span></a></li>
+    <li><a href="https://github.com/mihdicaballero/mento"><b data-i18n="pr2t">Código abierto</b><span data-i18n="pr2d">licencia MIT, cada línea a la vista</span></a></li>
+    <li><a href="https://doi.org/10.5281/zenodo.21956634"><b data-i18n="pr3t">Citable</b><span data-i18n="pr3d">con DOI en Zenodo, para tu tesis o tu informe</span></a></li>
+    <li><a href="https://mento-docs.readthedocs.io/en/latest/theory/index.html"><b data-i18n="pr4t">La teoría escrita</b><span data-i18n="pr4d">cada norma explicada en la documentación</span></a></li>
+    <li><div><b data-i18n="pr5t">CIRSOC 201-25</b><span data-i18n="pr5d">el único paquete abierto que la implementa, hasta donde sabemos</span></div></li>
+  </ul>
   <div class="band-cols">
     <div><b data-i18n="p1t">Nada sale de tu dispositivo</b><span data-i18n="p1d">El cálculo corre en tu navegador. Sin servidor, sin cuenta. Después de la primera carga funciona sin conexión.</span></div>
     <div><b data-i18n="p2t">Memoria en Word, no en PDF</b><span data-i18n="p2d">Un .docx editable con datos, tablas por combinación y cálculo detallado, para pegarlo en tu informe con tu formato.</span></div>
     <div><b data-i18n="p3t">Todo a la vista</b><span data-i18n="p3d">Tablas por combinación, cálculo paso a paso y, si querés, el código Python que reproduce el resultado.</span></div>
-  </div></div></section>
+  </div></section>
+
+<section class="pysec" id="python">
+  <div class="pysec-text">
+    <div class="eyebrow" data-i18n="py_eye">Para los que usan Python</div>
+    <h2 class="t-h2" data-i18n="py_t">La web resuelve una sección. El paquete, el proyecto entero.</h2>
+    <p class="say" data-i18n="py_d">Todo lo que calcula esta web lo hace mento, un paquete de Python abierto. Instalalo y usalo en un notebook, en tus scripts o dentro de las herramientas de tu oficina.</p>
+    <ol class="ladder">
+      <li class="is-here"><span class="lv">1</span><div><b data-i18n="l1t">Esta web</b><span data-i18n="l1d">Una sección por vez, al instante y sin instalar nada.</span></div><span class="here" data-i18n="here">Estás acá</span></li>
+      <li><span class="lv">2</span><div><b data-i18n="l2t">Todo el proyecto en un notebook</b><span data-i18n="l2d">Leés el Excel con las vigas que exporta tu modelo; mento verifica o diseña cada una y te devuelve el armado en Excel y la memoria Word del conjunto. El notebook queda guardado: cambiás un dato y lo volvés a correr.</span></div></li>
+      <li><span class="lv">3</span><div><b data-i18n="l3t">Dentro de tu propio flujo</b><span data-i18n="l3d">Importalo en tus scripts o en la librería de tu oficina, al lado de lo que ya tenés. Cada resultado vuelve como una tabla de pandas, lista para lo que sigue.</span></div></li>
+    </ol>
+    <div class="py-links"><a href="https://mento-docs.readthedocs.io/en/latest/getting_started/index.html" class="btn" data-i18n="py_start">Empezá con la guía →</a><a href="https://mento-docs.readthedocs.io/en/latest/examples/index.html" class="btn btn--sec" data-i18n="py_nb">Ejemplos en notebooks</a></div>
+  </div>
+  <!-- BeamSummary on the example of mento's user guide (four beams, ACI 318-19); py/test_site.py keeps these numbers in step with mento. -->
+  <div class="pycode">
+    <div class="pycode-hd"><span class="eyebrow" data-i18n="py_nbk">Notebook · vigas del proyecto</span><code>pip install mento</code></div>
+    <pre class="codeblock" translate="no" tabindex="0" role="region" data-i18n-aria="py_code" aria-label="Código de ejemplo con BeamSummary"><span class="kw">import</span> pandas <span class="kw">as</span> pd
+<span class="kw">from</span> mento <span class="kw">import</span> BeamSummary, Concrete_ACI_318_19, SteelBar, MPa
+
+conc = Concrete_ACI_318_19(name=<span class="str">"H-25"</span>, f_c=25 * MPa)
+steel = SteelBar(name=<span class="str">"ADN 420"</span>, f_y=420 * MPa)
+beams = pd.read_excel(<span class="str">"project.xlsx"</span>, sheet_name=<span class="str">"Beams"</span>)
+
+summary = BeamSummary(conc, steel, beams)
+summary.check()                       <span class="cm" data-i18n="py_c1"># tu armado, viga por viga</span>
+summary.design()                      <span class="cm" data-i18n="py_c2"># el armado de todas</span>
+summary.export_design(<span class="str">"design.xlsx"</span>)  <span class="cm" data-i18n="py_c3"># de vuelta a Excel</span>
+summary.results_detailed_doc()        <span class="cm" data-i18n="py_c4"># la memoria en Word</span></pre>
+    <div class="pyout">
+      <table class="df">
+        <thead><tr><th data-i18n="t_beam">Viga</th><th data-i18n="t_check">tu armado</th><th data-i18n="t_design">después de design()</th></tr></thead>
+        <tbody>
+          <tr><td>V101</td><td class="dcr ok"><span data-sum="V101 check">0.59</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td><td class="dcr ok"><span data-sum="V101 design">0.16</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td></tr>
+          <tr><td>V102</td><td class="dcr ok"><span data-sum="V102 check">0.68</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td><td class="dcr ok"><span data-sum="V102 design">0.68</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td></tr>
+          <tr><td>V103</td><td class="dcr bad"><span data-sum="V103 check">1.05</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="fails" aria-label="No cumple"><use href="#i-cross"/></svg></td><td class="dcr ok"><span data-sum="V103 design">0.76</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td></tr>
+          <tr><td>V104</td><td class="dcr bad"><span data-sum="V104 check">1.17</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="fails" aria-label="No cumple"><use href="#i-cross"/></svg></td><td class="dcr ok"><span data-sum="V104 design">0.85</span><svg class="mk" width="11" height="11" role="img" data-i18n-aria="passes" aria-label="Cumple"><use href="#i-check"/></svg></td></tr>
+        </tbody>
+      </table>
+      <p class="hint" data-i18n="py_out">Aprovechamiento que gobierna cada viga. Son las cuatro del ejemplo de la documentación, calculadas con la misma versión de mento que corre esta web.</p>
+    </div>
+  </div>
+</section>
+
+<section class="further" id="firms">
+  <div class="head"><h2 class="t-h2" data-i18n="fu_t">¿Querés llegar más lejos?</h2><p class="fu-sub" data-i18n="fu_s">mento es y va a seguir siendo gratis. Si necesitás más, te ayudamos.</p></div>
+  <div class="further-grid">
+    <div class="fcard fcard--biz">
+      <div class="eyebrow" data-i18n="b_eye">Para tu equipo o empresa</div>
+      <h3 class="fname" data-i18n="b_t">Herramientas sobre mento, hechas para tu oficina</h3>
+      <ul class="flist">
+        <li><b data-i18n="b1t">Herramientas a medida.</b> <span data-i18n="b1d">Memorias con la plantilla de tu oficina, diseño por lotes, lectura de lo que exportan Revit, ETABS o Robot.</span></li>
+        <li><b data-i18n="b2t">Capacitación del equipo.</b> <span data-i18n="b2d">Sesiones remotas para que tus ingenieros trabajen con Python, Jupyter, VS Code y Git, con mento como punto de partida.</span></li>
+        <li><b data-i18n="b3t">La norma o el elemento que te falta.</b> <span data-i18n="b3d">Lo desarrollamos como trabajo pago y después entra a mento para todos.</span></li>
+      </ul>
+      <div class="fcta"><a href="https://forms.gle/QoDzczQToLa78jMo7" class="btn" data-i18n="b_cta">Contanos qué necesitás →</a></div>
+    </div>
+    <div class="fcard">
+      <div class="eyebrow" data-i18n="c_eye">Para aprender por tu cuenta</div>
+      <h3 class="fname" data-i18n="c_t">Python para ingeniería civil</h3>
+      <span class="tag-soon" data-i18n="c_tag">Curso en preparación</span>
+      <p class="fdesc" data-i18n="c_d">Un curso de Mihdí para armar tus propias herramientas de cálculo: leer las tablas que exporta tu modelo, verificar una viga contra el libro y generar la memoria en Word, que se rehace sola cuando cambia un dato. En Google Colab, sin instalar nada.</p>
+      <div class="fcta"><a href="https://melodijouningeniero.com/" class="btn btn--sec" data-i18n="c_cta">Seguilo en Me lo dijo un ingeniero →</a></div>
+    </div>
+  </div>
+</section>
 
 <section class="support">
   <div><h2 class="t-h2" data-i18n="sup_t">mento es gratis y sin publicidad, y va a seguir así.</h2><p class="say" data-i18n="sup_d">Lo mantenemos en el tiempo que nos dejan los proyectos de la oficina. Si te ahorró una tarde, un café ayuda a que el proyecto siga vivo: hosting, horas de desarrollo y las calculadoras que faltan.</p>
@@ -119,7 +198,7 @@
   <div class="team-grid">
     <div class="person"><span class="av"><img src="shared/team/mihdi.jpg" alt="" width="52" height="52"></span><div><div class="nm" data-i18n="nm1">Esp. Ing. Mihdí Caballero</div><div class="rl"><span data-i18n="r1">Creador de mento · ingeniero estructural</span><br><span data-i18n="r1b">Socio director, RAMÉ Ingeniería</span></div><div class="links"><a href="https://www.linkedin.com/in/mihdicaballero/">LinkedIn</a><a href="https://github.com/mihdicaballero">GitHub</a><a href="https://melodijouningeniero.com/">Me lo dijo un ingeniero</a></div></div></div>
     <div class="person"><span class="av"><img src="shared/team/juan-pablo.jpg" alt="" width="52" height="52"></span><div><div class="nm" data-i18n="nm2">Ing. Juan Pablo Romaris</div><div class="rl"><span data-i18n="r2">Creador de mento · ingeniero estructural</span><br><span data-i18n="r2b">Universidad Tecnológica Nacional</span></div><div class="links"><a href="https://www.linkedin.com/in/juan-pablo-romaris-13ab4a173/">LinkedIn</a><a href="https://github.com/JuanPabloRomaris">GitHub</a></div></div></div>
-    <div class="about"><span data-i18n="about">mento nació de las planillas y scripts que usamos todos los días en la oficina para calcular hormigón. Los pasamos a un paquete de Python para poder testearlos, y a esta web para diseñar rápido sin instalar nada.</span><br><a href="https://forms.gle/QoDzczQToLa78jMo7" data-i18n="biz">Para empresas: herramientas a medida y capacitación →</a></div>
+    <div class="about"><span data-i18n="about">mento nació de las planillas y scripts que usamos todos los días en la oficina para calcular hormigón. Los pasamos a un paquete de Python para poder testearlos, y a esta web para diseñar rápido sin instalar nada.</span></div>
   </div></section>
 
 <footer class="foot"><span data-i18n="footer">Herramienta de apoyo. La verificación final es responsabilidad del profesional.</span><span class="spacer"></span><span>mento <span id="version">1.2.0</span> · <span data-i18n="oss">Código abierto</span> · <a href="https://github.com/mihdicaballero/mento">GitHub</a> · <a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a> · <a href="https://github.com/mihdicaballero/mento/discussions" data-i18n="feedback">Contanos qué te pareció</a></span></footer>
