@@ -8,12 +8,14 @@
 const LANG_KEY = "mento-lang";
 export const LANGS = ["es", "en"];
 
+// Spanish is the site's language: English only when the visitor picked it (or a link carries it),
+// never from the browser's language.
 export function preferredLang() {
   try {
     const saved = localStorage.getItem(LANG_KEY);
     if (LANGS.includes(saved)) return saved;
   } catch { /* storage blocked */ }
-  return (navigator.language || "es").toLowerCase().startsWith("es") ? "es" : "en";
+  return "es";
 }
 
 export function rememberLang(lang) {
