@@ -795,7 +795,7 @@ a.btn--sec:hover,a.btn--sec:active{color:var(--ink)}
 
 /* home hero: its drawing on the calculator's paper, with its dimension lines */
 .viz-draw{background-image:radial-gradient(circle at 1px 1px,var(--grid-dot) 1px,transparent 0);background-size:14px 14px;box-shadow:var(--sh-card)}
-.viz-draw .dw-dt{font-size:14px}
+.viz-draw .dw-dt,.ccard .fig .dw-dt{font-size:14px}
 
 /* ---------- 8b. MOTION · movement that says something changed, never decoration ----------
    Everything below is CSS or the browser's own animations (shared/ui.js): no library, and every
