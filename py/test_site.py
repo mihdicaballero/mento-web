@@ -132,7 +132,7 @@ def test_hero_shows_the_worked_example():
     assert hero["bottom"] == hero["opt1"] == bottom["bars"]
     assert hero["top"] == top["bars"]
     assert hero["stirrups"] == shear["stirrups"].replace(" cm", "").replace("/", " c/")
-    assert hero["section"] == f"{beam.EXAMPLE['width']} × {beam.EXAMPLE['height']}"
+    assert (hero["width"], hero["height"]) == (f"{beam.EXAMPLE['width']} cm", f"{beam.EXAMPLE['height']} cm")
     assert hero["bottom_dcr"] == hero["opt1_dcr"] == f"{bottom['DCR']:.2f}"
     assert hero["top_dcr"] == f"{top['DCR']:.2f}"
     assert hero["shear_dcr"] == f"{shear['DCR']:.2f}"

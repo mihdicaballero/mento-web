@@ -567,6 +567,7 @@ body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .top{position:sticky;top:0;z-index:20;height:56px;border-bottom-color:var(--line-2);
   background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px)}
 .top .title{font-weight:500;white-space:nowrap}
+.brand,.brand svg{flex-shrink:0}  /* a full header on a phone squeezed the logo to nothing; the title gives way instead */
 /* .sub is also the math subscript class, with line-height:0: a subtitle that wrapped printed its two
    lines on top of each other (the home at ~780 px). Now a pill that never wraps, and leaves when short of room */
 .top .sub{white-space:nowrap;line-height:1.5;vertical-align:baseline;padding:1px 8px;border-radius:999px;background:var(--surface-3);font-size:11.5px}
@@ -792,6 +793,10 @@ a.btn--sec:hover,a.btn--sec:active{color:var(--ink)}
 .skel-block{display:flex;flex-direction:column;gap:12px;padding:16px}
 @media (prefers-reduced-motion:reduce){ .skel{animation:none} }
 
+/* home hero: its drawing on the calculator's paper, with its dimension lines */
+.viz-draw{background-image:radial-gradient(circle at 1px 1px,var(--grid-dot) 1px,transparent 0);background-size:14px 14px;box-shadow:var(--sh-card)}
+.viz-draw .dw-dt{font-size:14px}
+
 /* ---------- 8b. MOTION · movement that says something changed, never decoration ----------
    Everything below is CSS or the browser's own animations (shared/ui.js): no library, and every
    element ends where it should if no frame runs */
@@ -823,11 +828,33 @@ a.btn--sec:hover,a.btn--sec:active{color:var(--ink)}
   background:linear-gradient(90deg,transparent,var(--brand),transparent) no-repeat;background-size:40% 100%;transition:opacity var(--t-fast)}
 .card.is-computing::before{opacity:1;transition-delay:120ms;animation:run 1s linear infinite}
 @keyframes run{from{background-position:-40% 0}to{background-position:140% 0}}
+/* the home's hero assembles once, as the calculator shows a result: the section, its bars, its
+   labels, mento's proposal, then the verdict with its meters filling */
+@keyframes slide-in{from{opacity:0;transform:translateX(16px)}}
+@keyframes fade{from{opacity:0}}
+@keyframes grow{from{width:0}}
+.viz-draw{animation:rise .5s var(--ease) backwards}
+.viz-draw .dw-bar{animation:bar-in .45s cubic-bezier(.34,1.56,.64,1) backwards;animation-delay:.35s}
+.viz-draw .dw-bar:nth-of-type(2){animation-delay:.4s} .viz-draw .dw-bar:nth-of-type(3){animation-delay:.45s}
+.viz-draw .dw-bar:nth-of-type(4){animation-delay:.5s} .viz-draw .dw-bar:nth-of-type(5){animation-delay:.55s}
+.viz-draw .dw-bar:nth-of-type(6){animation-delay:.6s}
+.viz-draw line,.viz-draw .dw-label,.viz-draw .dw-dl,.viz-draw .dw-dt{animation:fade .4s var(--ease) backwards;animation-delay:.7s}
+.viz-prop{animation:slide-in .5s var(--ease) backwards;animation-delay:.45s}
+.viz-prop .opt{animation:opt-in .3s var(--ease) backwards;animation-delay:.7s}
+.viz-prop .opt + .opt{animation-delay:.76s} .viz-prop .opt + .opt + .opt{animation-delay:.82s}
+.viz-verdict{animation:rise .5s var(--ease) backwards;animation-delay:.85s}
+.viz-verdict .mark{animation:mark-pop .5s var(--ease) backwards;animation-delay:1.1s}
+.viz-verdict .meter i{animation:grow .8s cubic-bezier(.22,1,.36,1) backwards;animation-delay:1.1s}
+/* home sections, as they are reached (home.js marks them only when there is motion to show) */
+.reveal-on [data-reveal]{opacity:0;transform:translateY(12px);transition:opacity .6s var(--ease),transform .6s var(--ease);transition-delay:calc(var(--i,0) * 60ms)}
+.reveal-on [data-reveal].is-in{opacity:1;transform:none}
+
 /* a disclosure folding shut is still [open] until it ends: its chevron turns back at once */
 .disc.is-closing summary::before{transform:none}
 @media (prefers-reduced-motion:reduce){
   .station-1,.station-2,.station-3,.station-4,.drawing,.below,.dw-new,.grp.is-opening .opt,
   .verdict.is-turning .mark,.verdict-strip.is-turning .mark,.verdict.is-turning .word,.verdict-strip.is-turning .word,
-  .card.is-computing::before{animation:none}
+  .card.is-computing::before,.viz-draw,.viz-draw .dw-bar,.viz-draw line,.viz-draw .dw-label,.viz-draw .dw-dl,
+  .viz-draw .dw-dt,.viz-prop,.viz-prop .opt,.viz-verdict,.viz-verdict .mark,.viz-verdict .meter i{animation:none}
   .meter i{transition:none}
 }
