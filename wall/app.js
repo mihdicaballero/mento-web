@@ -111,6 +111,8 @@ start({
   },
   tables: ["shear"],
   drawing,
+  // the section as typed, before the first result: its bars come in with it
+  preview: (state) => ({ section: { length: num(state.length), thickness: num(state.thickness), cover: num(state.cover) / 10, bars: [] }, rebar: {} }),
   python,
   barsFromLayouts,
 });

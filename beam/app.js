@@ -166,6 +166,14 @@ start({
   },
   tables: ["flexure", "shear"],
   drawing,
+  // the section as typed, before the first result: no bars yet, the stirrup still dashed
+  preview: (state) => ({
+    section: {
+      width: num(state.width), height: num(state.height), cover: num(state.cover) / 10,
+      stirrups: { n: 0, d: 0 }, bars: [], labels: { top: [], bot: [] },
+    },
+    rebar: {},
+  }),
   python,
   barsFromLayouts,
 });

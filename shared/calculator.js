@@ -216,6 +216,7 @@ export async function start(spec) {
     renderPython();
     if (!validate()) return;
     writeHash();
+    renderPreview();
     if (!ready) return markStale();  // a saved result on screen no longer answers these inputs
     clearTimeout(timer);
     timer = setTimeout(calculate, now ? 0 : 250);
@@ -412,8 +413,10 @@ export async function start(spec) {
     renderGroups(result);
     // Bars that were not in the drawing before appear one after another; the rest stay still.
     const drawn = new Set([...$("drawing").querySelectorAll(".dw-bar")].map(barKey));
+    const previewed = $("drawing").dataset.preview === "1";  // the section was up, its bars were not
+    delete $("drawing").dataset.preview;
     $("drawing").innerHTML = spec.drawing(result, t, window.matchMedia("(max-width: 720px)").matches);
-    if (drawn.size && !calm()) {
+    if ((drawn.size || previewed) && !calm()) {
       [...$("drawing").querySelectorAll(".dw-bar")].filter((bar) => !drawn.has(barKey(bar)))
         .forEach((bar, index) => { bar.classList.add("dw-new"); bar.style.animationDelay = `${index * 45}ms`; });
     }
@@ -423,6 +426,29 @@ export async function start(spec) {
     renderPython();
     clearStale();
     if (result.changed?.length) flagChanged(result.changed);
+  }
+
+  // ------------------------------------------------------------ before the first result
+  // Python takes seconds to start. Meanwhile nothing on the page is blank: the drawing shows the
+  // section as typed, without bars (they come in with the result), and the rebar groups and the
+  // result tables hold shimmering placeholders of their shape.
+  function renderPreview() {
+    if (lastResult || !spec.preview) return;
+    const draft = spec.preview(state);
+    const sizes = Object.values(draft.section).filter((value) => typeof value === "number");
+    if (!sizes.every((value) => Number.isFinite(value) && value >= 0)) return;
+    $("drawing").innerHTML = spec.drawing(draft, t, window.matchMedia("(max-width: 720px)").matches);
+    $("drawing").dataset.preview = "1";
+  }
+
+  function renderPlaceholders() {
+    if (lastResult) return;
+    const line = (width) => `<span class="skel" style="width:${width}%"></span>`;
+    $("groups").innerHTML = spec.groups.map(({ label }) => `<div class="grp grp--skel" aria-hidden="true"><div class="hd">`
+      + `<span class="lbl">${t[label]}</span>${line(70)}<span class="skel skel--pill"></span><span></span></div></div>`).join("");
+    const block = `<div class="skel-block" aria-hidden="true">${[92, 78, 85, 64].map(line).join("")}</div>`;
+    for (const name of spec.tables) $(`table-${name}`).innerHTML = block;
+    $("detailed").innerHTML = block;
   }
 
   // Restarts a one-off animation class, so a second change in a row plays it again. Taken off by
@@ -638,6 +664,7 @@ export async function start(spec) {
     t = applyStrings(strings, lang);
     renderCombos();
     if (lastResult) render(lastResult);
+    else { renderPlaceholders(); renderPreview(); }
     renderPython();
     writeHash();
   }
@@ -764,5 +791,7 @@ export async function start(spec) {
   validate();
   renderPython();
   showStep("python");
+  renderPlaceholders();
+  renderPreview();
   if (!ready) showSaved();
 }

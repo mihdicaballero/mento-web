@@ -107,6 +107,8 @@ start({
   bars: { bot_d: ["bot", "d"], bot_s: ["bot", "s"], top_d: ["top", "d"], top_s: ["top", "s"] },
   tables: ["flexure", "shear"],
   drawing,
+  // the section as typed, before the first result: its bars come in with it
+  preview: (state) => ({ section: { width: num(state.width), height: num(state.height), cover: num(state.cover) / 10, bars: [] }, rebar: {} }),
   python,
   barsFromLayouts,
 });
