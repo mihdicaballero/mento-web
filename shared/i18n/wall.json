@@ -102,7 +102,10 @@
   "image_saved": "Imagen descargada",
   "image_file": "seccion",
   "dcr_max": "DCR máx.",
-  "notice_bad": "No verifica."
+  "notice_bad": "No verifica.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "mín.",
+  "max_short": "máx."
  },
  "en": {
   "calc": "Calculators",
@@ -207,6 +210,9 @@
   "image_saved": "Image downloaded",
   "image_file": "section",
   "dcr_max": "Max DCR",
-  "notice_bad": "Fails."
+  "notice_bad": "Fails.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "min.",
+  "max_short": "max."
  }
 }

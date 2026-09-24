@@ -96,3 +96,17 @@ def test_report_is_one_word_file_with_flexure_and_shear():
     document = docx.Document(io.BytesIO(base64.b64decode(file["base64"])))
     text = " ".join(paragraph.text.lower() for paragraph in document.paragraphs)
     assert "flexur" in text and "shear" in text
+
+
+def test_the_worked_example_has_no_errors():
+    # its top steel is under the 4/3 of the calculated steel that waives the minimum: a warning,
+    # as mento's table of checks says, not a strength shortfall
+    notices = solve()["notices"]
+    assert not [notice for notice in notices if notice["severity"] == "bad"], notices
+    assert any(notice["code"] == "as_below_min" for notice in notices)
+
+
+def test_bars_closer_than_the_minimum_clear_spacing_fail():
+    result = solve(mode="check", rebar={"bot": {"d": 16, "s": 3}, "top": {"d": 12, "s": 25}})
+    spacing = [notice for notice in result["notices"] if notice["code"] == "spacing"]
+    assert spacing and spacing[0]["severity"] == "bad" and spacing[0]["values"]["face"] == "bottom"

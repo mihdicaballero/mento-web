@@ -116,6 +116,10 @@ def test_top_steel_short_of_the_compression_a_doubly_reinforced_beam_needs_fails
     assert float(top["values"]["limit"].split()[0]) > 1.99
 
 
+def test_the_worked_example_has_no_errors():
+    assert not [notice for notice in solve()["notices"] if notice["severity"] == "bad"]
+
+
 def test_check_mode_reports_insufficient_rebar():
     rebar = {"bot": {"n1": 2, "d1": 10}, "top": {}, "stirrups": {"n": 1, "d": 6, "s": 20}}
     result = solve(mode="check", rebar=rebar)

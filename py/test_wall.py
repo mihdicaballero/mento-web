@@ -71,11 +71,16 @@ def test_check_mode_takes_the_mesh_the_user_typed():
     assert result["options"] == {}
 
 
-def test_a_mesh_below_the_minimum_ratio_is_a_notice():
+def test_a_mesh_below_the_minimum_ratio_fails_as_mento_marks_it():
     result = solve(mode="check", rebar={"horizontal": {"d": 6, "s": 45}, "vertical": {"d": 6, "s": 45}})
     assert result["ok"], result
-    codes = [notice["code"] for notice in result["notices"]]
-    assert codes.count("rho_below_min") == 2
+    ratios = [notice for notice in result["notices"] if notice["code"] == "rho_below_min"]
+    assert [notice["values"]["face"] for notice in ratios] == ["horizontal", "vertical"]
+    assert all(notice["severity"] == "bad" for notice in ratios)  # mento marks them ❌
+
+
+def test_the_worked_example_has_no_errors():
+    assert not [notice for notice in solve()["notices"] if notice["severity"] == "bad"]
 
 
 def test_the_drawing_is_a_horizontal_cut_with_two_curtains():

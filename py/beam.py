@@ -571,82 +571,6 @@ def _ledger(beam: RectangularBeam, forces: list[Forces], code: str) -> list[dict
     return rows
 
 
-def _below(value: Any, limit: Any, slack: float) -> bool:
-    if value is None or limit is None:
-        return False
-    return float(value.to(limit.units).magnitude) < float(limit.magnitude) * slack
-
-
-PASSES = ("✅", "✅ D.R.", "")  # D.R.: past the singly reinforced maximum, which the compression steel allows
-
-
-def _checks(report: dict[str, Any]) -> list[list[str]]:
-    """The rows of a report's table of checks (the one with limits and an Ok? column)."""
-    return next((table["rows"] for table in report["tables"] if len(table["columns"]) > 3), [])
-
-
-def _requirement(beam: RectangularBeam, forces: list[Forces], name: str) -> dict[str, Any] | None:
-    """The steel a face needs against the steel it has. mento's ``A_s_req`` of a face is the
-    envelope of what every combination asks of it: tension under a moment that pulls that face,
-    or compression when the opposite face's moment needs a doubly reinforced section. Which of
-    the two governs is told by the sign of the governing combination's moment."""
-    face = getattr(beam.flexure_design, name)
-    if face.A_s_req is None or not _below(face.A_s, face.A_s_req, 0.999):
-        return None
-    checks = [check for check in beam.flexure_check_results(forces) if getattr(check, name).A_s_req is not None]
-    governing = max(checks, key=lambda check: getattr(check, name).A_s_req)
-    moment = float(next(force for force in forces if force.label == governing.label).M_y.to("kN*m").magnitude)
-    pulls = moment > 0 if name == "bottom" else moment < 0
-    return {
-        "code": "as_short",
-        "severity": "bad",
-        "values": {
-            "face": name,
-            "A_s": _quantity(face.A_s, "cm**2"),
-            "limit": _quantity(face.A_s_req, "cm**2"),
-            "why": "tension" if pulls else "compression",
-            "combo": governing.label,
-        },
-    }
-
-
-def _notices(
-    beam: RectangularBeam, forces: list[Forces], reports: list[dict[str, Any]], captured: list[Any]
-) -> list[dict[str, Any]]:
-    """What the page flags, as mento judges it: every warning mento raises, the steel each face
-    needs, and mento's own table of checks, read from its detailed results (the only public place
-    it is in). Its rows come in a fixed order: As and bar spacing of the top face, then of the
-    bottom. A row that passes, or passes as doubly reinforced, says nothing; a clause in place of
-    the mark is the minimum mento lets go under its own rule, a warning; a cross is an error.
-    mento has no structured warning list yet, so the codes are named here and the page writes the
-    sentence."""
-    notices: list[dict[str, Any]] = [
-        {"code": "mento", "severity": "warn", "values": {"message": str(item.message)}} for item in captured
-    ]
-    for name in ("bottom", "top"):
-        short = _requirement(beam, forces, name)
-        if short:
-            notices.append(short)
-    rows = _checks(reports[0]) if reports else []
-    faces = {0: "top", 1: "top", 2: "bottom", 3: "bottom"}
-    for index, (label, unit, value, low, high, mark) in enumerate(rows[:4]):
-        if mark in PASSES:
-            continue
-        values = {"face": faces[index], "value": value, "unit": unit, "min": low, "max": high, "label": label}
-        if index in (0, 2):
-            above = bool(high) and float(value) > float(high)
-            code = "as_above_max" if above else "as_below_min"
-            values.update({"A_s": f"{value} {unit}", "limit": f"{high if above else low} {unit}"})
-        else:
-            code = "spacing"
-        notices.append({"code": code, "severity": "bad" if mark == "❌" else "warn", "values": values})
-    for label, unit, value, low, high, mark in _checks(reports[1]) if len(reports) > 1 else []:
-        if mark not in PASSES:
-            values = {"label": label, "value": value, "unit": unit, "min": low, "max": high}
-            notices.append({"code": "mento_check", "severity": "bad" if mark == "❌" else "warn", "values": values})
-    return notices
-
-
 def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
@@ -689,7 +613,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "selected": selected,
         "changed": changed,
         "ledger": _ledger(beam, forces, data["code"]),
-        "notices": _notices(beam, forces, detailed["reports"], list(captured)),
+        "notices": common.flexure_notices(beam, forces, detailed["reports"], list(captured)),
         "flexure": {"bottom": _face(flexure.bottom), "top": _face(flexure.top)},
         "shear": {
             "stirrups": _layout_bars(layouts.get("st") or {}),

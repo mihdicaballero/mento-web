@@ -522,7 +522,8 @@ export async function start(spec) {
     const values = item.values || {};
     const lead = `<b>${item.severity === "bad" ? t.notice_bad : t.notice}</b>`;
     if (item.code === "mento") return `${lead} ${values.message}`;
-    const face = values.face === "top" ? t.top_l : t.bot_l;
+    // a beam's and a slab's faces are top and bottom (top_l, bot_l), a wall's its two meshes
+    const face = t[{ top: "top_l", bottom: "bot_l" }[values.face] ?? `${values.face}_l`] ?? "";
     // a check of mento's own table: the bound it misses, when it names one
     const value = Number(values.value);
     const limit = values.min !== "" && value < Number(values.min) ? ` &lt; ${t.min_short} ${values.min}`

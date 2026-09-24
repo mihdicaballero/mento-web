@@ -102,7 +102,14 @@
   "image_saved": "Imagen descargada",
   "image_file": "seccion",
   "dcr_max": "DCR máx.",
-  "notice_bad": "No verifica."
+  "notice_bad": "No verifica.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "mín.",
+  "max_short": "máx.",
+  "as_short": "Armadura {face} insuficiente: <span class=\"mono\">{A_s} &lt; {limit}</span> que pide la {why} en {combo}.",
+  "why_tension": "tracción",
+  "why_compression": "compresión (doble armadura)",
+  "spacing": "Las barras {face} quedan muy juntas: separación libre <span class=\"mono\">{value} mm &lt; {min} mm</span>. Separalas más o usá un diámetro menor."
  },
  "en": {
   "calc": "Calculators",
@@ -207,6 +214,13 @@
   "image_saved": "Image downloaded",
   "image_file": "section",
   "dcr_max": "Max DCR",
-  "notice_bad": "Fails."
+  "notice_bad": "Fails.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "min.",
+  "max_short": "max.",
+  "as_short": "{face} reinforcement short: <span class=\"mono\">{A_s} &lt; {limit}</span> required by {why} in {combo}.",
+  "why_tension": "tension",
+  "why_compression": "compression (doubly reinforced)",
+  "spacing": "The {face} bars are too close: clear spacing <span class=\"mono\">{value} mm &lt; {min} mm</span>. Space them wider or use a smaller bar."
  }
 }

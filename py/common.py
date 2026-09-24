@@ -284,34 +284,109 @@ def below(value: Any, limit: Any, slack: float = 0.999) -> bool:
     return float(value.to(limit.units).magnitude) < float(limit.magnitude) * slack
 
 
-def face_notices(faces: list[tuple[Any, str]], captured: list[Any]) -> list[dict[str, Any]]:
-    """What mento flags about detailing: everything it raises as a warning, plus the minimums and
-    maximums its public results expose. mento has no structured warning list yet, so the codes are
-    named here and the page writes the sentence."""
-    notices = [{"code": "mento", "values": {"message": str(item.message)}} for item in captured]
-    for face, name in faces:
-        if below(face.A_s, face.A_s_min):
-            notices.append(
-                {
-                    "code": "as_below_min",
-                    "values": {
-                        "face": name,
-                        "A_s": quantity(face.A_s, "cm**2"),
-                        "limit": quantity(face.A_s_min, "cm**2"),
-                    },
-                }
-            )
-        if face.A_s_max is not None and below(face.A_s_max, face.A_s, 1.0):
-            notices.append(
-                {
-                    "code": "as_above_max",
-                    "values": {
-                        "face": name,
-                        "A_s": quantity(face.A_s, "cm**2"),
-                        "limit": quantity(face.A_s_max, "cm**2"),
-                    },
-                }
-            )
+PASSES = ("✅", "✅ D.R.", "")  # D.R.: past the singly reinforced maximum, which the compression steel allows
+
+
+def captured_notices(captured: list[Any]) -> list[dict[str, Any]]:
+    """Every warning mento raised while checking, as it worded it."""
+    return [{"code": "mento", "severity": "warn", "values": {"message": str(item.message)}} for item in captured]
+
+
+def check_rows(report: dict[str, Any]) -> list[list[str]]:
+    """The rows of a report's table of checks (the one with limits and an Ok? column)."""
+    return next((table["rows"] for table in report["tables"] if len(table["columns"]) > 3), [])
+
+
+def _severity(mark: str) -> str:
+    """A cross is an error; a clause in place of the mark is a limit mento lets go under its own
+    rule (the 4/3 of the minimum), a warning."""
+    return "bad" if mark == "❌" else "warn"
+
+
+def check_notices(report: dict[str, Any], named: dict[int, tuple[str, str]] | None = None) -> list[dict[str, Any]]:
+    """mento's own table of checks, as the page flags it: a row that passes says nothing, any other
+    becomes a notice with mento's wording of the check, in the page's language. ``named`` gives some
+    rows, by position, a sentence of the page's own: ``{index: (code, face)}``."""
+    notices = []
+    for index, (label, unit, value, low, high, mark) in enumerate(check_rows(report)):
+        if mark in PASSES:
+            continue
+        values = {"label": label, "value": value, "unit": unit, "min": low, "max": high}
+        code, face = (named or {}).get(index, ("mento_check", ""))
+        if face:
+            values["face"] = face
+        notices.append({"code": code, "severity": _severity(mark), "values": values})
+    return notices
+
+
+def flexure_check_notices(report: dict[str, Any]) -> list[dict[str, Any]]:
+    """A beam's or a slab's table of flexure checks, whose rows come in a fixed order: As and bar
+    spacing of the top face, then of the bottom. As past a limit and bars too close have a sentence
+    of their own."""
+    named = {0: ("as_limit", "top"), 1: ("spacing", "top"), 2: ("as_limit", "bottom"), 3: ("spacing", "bottom")}
+    notices = check_notices(report, named)
+    for notice in notices:
+        if notice["code"] != "as_limit":
+            continue
+        values = notice["values"]
+        above = bool(values["max"]) and float(values["value"]) > float(values["max"])
+        notice["code"] = "as_above_max" if above else "as_below_min"
+        values.update(
+            {
+                "A_s": f"{values['value']} {values['unit']}",
+                "limit": f"{values['max' if above else 'min']} {values['unit']}",
+            }
+        )
+    return notices
+
+
+def requirement_notice(element: Any, forces: list[Any], name: str) -> dict[str, Any] | None:
+    """The steel a face needs for strength against the steel it has, combination by combination.
+
+    Where a combination's moment pulls the face, what strength asks is ``A_s_calc``: mento's
+    ``A_s_req`` there also carries the minimum's own rule (4/3 of the calculated steel, ACI 9.6.1.3),
+    which its table of checks already reports as a minimum, a warning. Where the moment pushes the
+    face, its ``A_s_req`` is the compression steel of a doubly reinforced section, ``A_s_calc``
+    being zero. The largest of these, against the face's steel."""
+    face = getattr(element.flexure_design, name)
+    needs = []
+    for check in element.flexure_check_results(forces):
+        moment = float(next(force for force in forces if force.label == check.label).M_y.to("kN*m").magnitude)
+        pulls = moment > 0 if name == "bottom" else moment < 0
+        asked = getattr(check, name).A_s_calc if pulls else getattr(check, name).A_s_req
+        if asked is not None and asked.magnitude > 0:
+            needs.append((asked, "tension" if pulls else "compression", check.label))
+    if not needs:
+        return None
+    asked, why, combo = max(needs, key=lambda need: need[0])
+    if not below(face.A_s, asked):
+        return None
+    return {
+        "code": "as_short",
+        "severity": "bad",
+        "values": {
+            "face": name,
+            "A_s": quantity(face.A_s, "cm**2"),
+            "limit": quantity(asked, "cm**2"),
+            "why": why,
+            "combo": combo,
+        },
+    }
+
+
+def flexure_notices(
+    element: Any, forces: list[Any], reports: list[dict[str, Any]], captured: list[Any]
+) -> list[dict[str, Any]]:
+    """What the page flags on a beam or a slab strip, as mento judges it: its warnings, the steel
+    each face needs, and its tables of checks, read from its detailed results (the only public place
+    they are in), flexure first and shear second. mento has no structured warning list yet, so the
+    codes are named here and the page writes the sentence."""
+    notices = captured_notices(captured)
+    notices += [notice for name in ("bottom", "top") if (notice := requirement_notice(element, forces, name))]
+    if reports:
+        notices += flexure_check_notices(reports[0])
+    if len(reports) > 1:
+        notices += check_notices(reports[1])
     return notices
 
 
