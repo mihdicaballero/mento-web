@@ -225,7 +225,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "notices": common.face_notices([(flexure.bottom, "bottom"), (flexure.top, "top")], list(captured)),
         "tables": {"flexure": common.table(flexure_table), "shear": common.table(shear_table)},
         "section": _section(slab, layouts),
-        "detailed": common.printed(node.flexure_results_detailed, node.shear_results_detailed),
+        **common.detailed(node.flexure_results_detailed, node.shear_results_detailed),
     }
 
 

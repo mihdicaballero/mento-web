@@ -18,7 +18,15 @@ py/                 common.py plus one glue module per calculator, and their tes
 ```
 
 `shared/style.css` is the `<style id="site">` block of the design system, copied verbatim; the
-only additions are at the end of the file, marked as such. Every UI string lives in
+additions are at the end of the file, marked as such. The last of them, section 8, is design
+system v2: the stations as panels, softer controls with a single focus ring, a styled open list
+for `<select>` where the browser supports it, and dimension lines in the drawings. Light only.
+Section 8b is its movement (numbers that count, meters that grow, disclosures that fold): CSS and
+the browser's own animations, no library, and nothing that stays half-done if no frame runs.
+
+mento prints its detailed results as text and keeps the tables behind them private, so
+`common.reports()` reads the printout back into tables (a dashed rule marks each column) and the
+page lays them out as cards. The printout itself still travels, for the Copiá button. Every UI string lives in
 `shared/i18n/<page>.json` and reaches the markup through `data-i18n`; the Spanish in the HTML is
 the first paint and `py/test_site.py` keeps it equal to the dictionary.
 

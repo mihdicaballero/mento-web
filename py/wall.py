@@ -217,7 +217,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
         wall, frame = _checked(data, forces, layouts)
-        detailed = common.printed(wall.shear_results_detailed)
+        detailed = common.detailed(wall.shear_results_detailed)
 
     if not check_mode:
 
@@ -243,7 +243,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "notices": _notices(frame, list(captured)),
         "tables": {"shear": common.table(frame)},
         "section": _section(wall, layouts),
-        "detailed": detailed,
+        **detailed,
     }
 
 

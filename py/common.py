@@ -12,6 +12,7 @@ import copy
 import io
 import math
 import os
+import re
 import tempfile
 from collections.abc import Callable
 from typing import Any
@@ -126,6 +127,53 @@ def printed(*calls: Callable[[], Any]) -> str:
         for write in calls:
             write()
     return out.getvalue()
+
+
+def detailed(*calls: Callable[[], Any]) -> dict[str, Any]:
+    """The detailed results twice: as mento prints them, for the Copiá button, and as tables."""
+    text = printed(*calls)
+    return {"detailed": text, "reports": reports(text)}
+
+
+_BANNER = re.compile(r"=+ (.+?) =+")
+_RULE = re.compile(r"-+(?: +-+)*")
+
+
+def reports(text: str) -> list[dict[str, Any]]:
+    """What mento prints as detailed results, as data the page lays out itself.
+
+    mento keeps the tables behind those printouts private, so this reads the printout: one report
+    per ``===== TITLE =====`` banner, one table per block. A block is a header line, a rule of
+    dashes that marks where each column starts, rows, and a blank line. The first header cell names
+    the table and the first column describes each row. A cell runs to where the next column starts,
+    not to the end of its dashes: a value wider than its column (an emoji counted twice) stays whole.
+    """
+    found: list[dict[str, Any]] = []
+    lines = [line.rstrip() for line in text.splitlines()]
+    index = 0
+    while index < len(lines):
+        banner = _BANNER.fullmatch(lines[index].strip())
+        if banner:
+            found.append({"title": banner.group(1), "tables": []})
+            index += 1
+            continue
+        if found and index + 1 < len(lines) and lines[index].strip() and _RULE.fullmatch(lines[index + 1].strip()):
+            starts = [match.start() for match in re.finditer(r"-+", lines[index + 1])]
+
+            def cut(line: str, starts: list[int] = starts) -> list[str]:
+                ends = [*starts[1:], None]
+                return [line[start:end].strip() for start, end in zip(starts, ends, strict=True)]
+
+            header = cut(lines[index])
+            index += 2
+            rows = []
+            while index < len(lines) and lines[index].strip() and not _BANNER.fullmatch(lines[index].strip()):
+                rows.append(cut(lines[index]))
+                index += 1
+            found[-1]["tables"].append({"title": header[0], "columns": header[1:], "rows": rows})
+            continue
+        index += 1
+    return found
 
 
 def row_value(frame: Any, index: int, column: str) -> Any:

@@ -2,15 +2,30 @@
 // paint the four stations. A page supplies a spec (its fields, its rebar groups, its drawing
 // and its Python snippet) and the markup the design system defines; everything else is here.
 import { applyStrings, loadStrings, preferredLang, rememberLang } from "./i18n.js";
-import { copy, numberField, radiogroup, toast } from "./ui.js";
+import { calm, copy, escapeHtml, foldable, highlightPython, numberField, radiogroup, toast, tween } from "./ui.js";
 
 export const $ = (id) => document.getElementById(id);
 export const num = (value) => Number(String(value ?? "").replace(",", ".").replace("−", "-"));
 export const dcrState = (dcr) => (dcr === null || dcr === undefined ? "none" : dcr <= 0.95 ? "ok" : dcr <= 1 ? "warn" : "bad");
 export const two = (dcr) => (dcr === null || dcr === undefined ? "—" : dcr.toFixed(2));
-// Room a drawing keeps on its left for the "b × h" note set at 14 px, with its 12 px gap to the
-// section and a little margin: about 8 px a character in IBM Plex Sans.
-export const noteRoom = (note) => 16 + 12 + note.length * 8;
+// Dimension lines, as a drawing shows them: extension lines off the section's edges, the line
+// between them with oblique ticks, the value beside it. `edge` is the section's edge they leave from.
+const tick = (x, y) => `<path class="dw-dl" d="M${x - 3} ${y + 3}L${x + 3} ${y - 3}"/>`;
+export function dimBelow(x1, x2, edge, y, text) {
+  return `<path class="dw-dl" d="M${x1} ${edge + 4}V${y + 4}M${x2} ${edge + 4}V${y + 4}M${x1 - 4} ${y}H${x2 + 4}"/>`
+    + tick(x1, y) + tick(x2, y)
+    + `<text class="dw-dt" x="${(x1 + x2) / 2}" y="${y + 15}" text-anchor="middle">${text}</text>`;
+}
+export function dimLeft(y1, y2, edge, x, text) {
+  const [tx, ty] = [x - 7, (y1 + y2) / 2];
+  // along the line when it is long enough for the value (~8 px a character), across it otherwise:
+  // a 20 cm wall 3 m long leaves ~30 px
+  const label = y2 - y1 >= text.length * 8 + 8
+    ? `<text class="dw-dt" x="${tx}" y="${ty}" text-anchor="middle" transform="rotate(-90 ${tx} ${ty})">${text}</text>`
+    : `<text class="dw-dt" x="${x - 8}" y="${ty + 4}" text-anchor="end">${text}</text>`;
+  return `<path class="dw-dl" d="M${edge - 4} ${y1}H${x - 4}M${edge - 4} ${y2}H${x - 4}M${x} ${y1 - 4}V${y2 + 4}"/>`
+    + tick(x, y1) + tick(x, y2) + label;
+}
 
 // Concrete and steel of each code, by commercial name and characteristic value, so the engineer
 // can check what they picked without opening anything.
@@ -35,6 +50,19 @@ export const CONCRETE_CLASS = {
 };
 
 const HASH_VERSION = "1";
+
+// ------------------------------------------------------------ detailed results
+// mento's printed tables, laid out (py/common.py reads them). A symbol as the printout spells it,
+// set as a formula: italic variable, upright subscript ("Mu,top" is M with "u,top" below it).
+// Words in capitals (DCR), and anything with an operator in it (n1+n2, c/d), stay as they are.
+export function symbolHtml(text) {
+  const match = /^([ØΦ]?)([A-Za-zα-ωΑ-Ω])([A-Za-z0-9α-ω,. ]*)$/.exec(text);
+  if (!match || /^[A-Z]{2,}$/.test(text)) return escapeHtml(text);
+  const [, phi, main, rest] = match;
+  if (phi && !rest) return `${phi}<sub>${escapeHtml(main)}</sub>`;  // Øv: the factor, subscript v
+  return `${phi}<i>${escapeHtml(main)}</i>${rest ? `<sub>${escapeHtml(rest)}</sub>` : ""}`;
+}
+const sentence = (title) => title.charAt(0) + title.slice(1).toLowerCase();
 
 // The section drawing as a PNG, to paste into a report. An SVG turned into an image sees none of
 // the page's stylesheet, so every element takes its computed look along; drawn at 3× on white.
@@ -92,11 +120,12 @@ export async function start(spec) {
         return Object.fromEntries([["label", cells[0]], ...spec.forces.map((key, index) => [key, cells[index + 1]])]);
       });
       if (forces.length) next.forces = forces;
+      // a link made before a calculator grew fields carries fewer; the new ones keep the example's
       const bars = (params.get("r") || "").split(",");
-      if (bars.length === barIds.length) {
-        barIds.forEach((id, index) => {
-          const [group, key] = spec.bars[id];
-          next.rebar[group][key] = Number(bars[index]);
+      if (bars.length > 1 && bars.length <= barIds.length) {
+        bars.forEach((value, index) => {
+          const [group, key] = spec.bars[barIds[index]];
+          next.rebar[group][key] = Number(value);
         });
       }
       next.choice = Object.fromEntries(groups.map((group, index) => [group, (params.get("ch") || "").split(";")[index] || ""]));
@@ -134,7 +163,6 @@ export async function start(spec) {
   let ready = false;
   let version = 0;   // the edit a result must match to be applied
   let applied = 0;   // the edit the screen is showing
-  const started = Date.now();
 
   function call(type, message) {
     return new Promise((resolve, reject) => {
@@ -172,12 +200,6 @@ export async function start(spec) {
     $("progress").style.width = `${8 + 23 * (reached + 1)}%`;
   }
 
-  setInterval(() => {
-    if (ready || lastResult) return;
-    $("elapsed").textContent = `${Math.round((Date.now() - started) / 1000)} s`;
-    $("strip").querySelector(".readout").textContent = $("elapsed").textContent;
-  }, 500);
-
   function showFatal(message) {
     $("loading").hidden = true;
     $("output").hidden = false;
@@ -201,6 +223,7 @@ export async function start(spec) {
 
   async function calculate() {
     const mine = version;
+    $("result").classList.add("is-computing");
     clearTimeout(staleTimer);
     staleTimer = setTimeout(() => { if (applied !== mine) markStale(); }, 150);
     const sent = payload();
@@ -211,6 +234,7 @@ export async function start(spec) {
       result = { ok: false, kind: "mento", message: error.message };
     }
     if (mine !== version) return;   // a newer edit is already on its way
+    $("result").classList.remove("is-computing");
     clearTimeout(staleTimer);
     applied = mine;
     render(result);
@@ -321,7 +345,7 @@ export async function start(spec) {
 
   // ------------------------------------------------------------ rendering
   function notice(kind, text) {
-    const mark = kind === "warn" ? '<svg width="16" height="16"><use href="#i-warn"/></svg>' : "";
+    const mark = `<svg width="16" height="16"><use href="#${kind === "bad" ? "i-cross" : "i-warn"}"/></svg>`;
     return `<div class="notice notice--${kind}" role="${kind === "bad" ? "alert" : "status"}">${mark}<span>${text}</span></div>`;
   }
 
@@ -332,19 +356,30 @@ export async function start(spec) {
     $("verdict").hidden = false;
 
     const governing = Math.max(...result.ledger.map((row) => row.dcr ?? 0));
-    const status = dcrState(governing);
+    // A check mento fails that has no ratio of its own (steel short of what is required, bars that
+    // do not fit) fails the element as a DCR above one would: the number stays, the word says why not.
+    const failed = result.notices.some((item) => item.severity === "bad");
+    const status = failed ? "bad" : dcrState(governing);
     const word = status === "bad" ? t.fails : status === "warn" ? t.passes_limit : t.passes;
-    lastResult = { ...result, dcr: two(governing) };
+    const before = lastResult;  // what the screen shows now, for the movement from it to this
+    lastResult = { ...result, dcr: two(governing), governing, status };
 
     $("verdict").dataset.state = status;
     $("verdict-word").textContent = word;
-    $("verdict-dcr").textContent = two(governing);
+    tween($("verdict-dcr"), before?.governing, governing, two);
     $("verdict").querySelector("use").setAttribute("href", status === "bad" ? "#i-cross" : "#i-check");
+    const turned = before && before.status !== status;
+    if (turned) replay($("verdict"), "is-turning");
 
     $("strip").dataset.state = status;
     $("strip").innerHTML = `<span class="mark"><svg width="14" height="14"><use href="#${status === "bad" ? "i-cross" : "i-check"}"/></svg></span>`
-      + `<span class="word">${word}</span><span class="readout">${two(governing)}</span>`;
+      + `<span class="word">${word}</span><span class="readout"></span>`;
+    tween($("strip").querySelector(".readout"), before?.governing, governing, two);
+    if (turned) replay($("strip"), "is-turning");
 
+    // The meters grow from where they were: each starts at its old width and the stylesheet's
+    // transition takes it to the new one.
+    const was = new Map((before?.ledger || []).map((row) => [row.key, row.dcr]));
     $("ledger").innerHTML = result.ledger.map((row) => {
       const width = Math.min(row.dcr ?? 0, 1) * 100;
       const detail = row.combo
@@ -354,19 +389,95 @@ export async function start(spec) {
         + `<div class="meter" data-state="${dcrState(row.dcr)}"><i style="width:${width}%"></i><s></s></div>`
         + `<span class="dcr ${dcrState(row.dcr)}">${two(row.dcr)}</span></div>`;
     }).join("");
+    result.ledger.forEach((row, index) => {
+      const line = $("ledger").children[index];
+      const old = was.get(row.key);
+      tween(line.querySelector(".dcr"), old, row.dcr, two);
+      if (calm() || typeof old !== "number") return;
+      const fill = line.querySelector(".meter i");
+      const target = fill.style.width;
+      fill.style.transition = "none";
+      fill.style.width = `${Math.min(old, 1) * 100}%`;
+      void fill.offsetWidth;
+      fill.style.transition = "";
+      fill.style.width = target;
+    });
 
-    $("notices").innerHTML = result.notices.map((item) => notice("warn", noticeText(item))).join("");
+    // errors first: they are why the verdict says what it says
+    const ordered = [...result.notices].sort((a, b) => (b.severity === "bad") - (a.severity === "bad"));
+    $("notices").innerHTML = ordered.map((item) => notice(item.severity === "bad" ? "bad" : "warn", noticeText(item))).join("");
     $("warn-count").textContent = result.notices.length === 0 ? t.nowarn
       : result.notices.length === 1 ? t.warn_one : t.warn_many.replace("{n}", result.notices.length);
 
     renderGroups(result);
+    // Bars that were not in the drawing before appear one after another; the rest stay still.
+    const drawn = new Set([...$("drawing").querySelectorAll(".dw-bar")].map(barKey));
     $("drawing").innerHTML = spec.drawing(result, t, window.matchMedia("(max-width: 720px)").matches);
+    if (drawn.size && !calm()) {
+      [...$("drawing").querySelectorAll(".dw-bar")].filter((bar) => !drawn.has(barKey(bar)))
+        .forEach((bar, index) => { bar.classList.add("dw-new"); bar.style.animationDelay = `${index * 45}ms`; });
+    }
     $("copy-drawing").disabled = false;
     for (const name of spec.tables) renderTable(name, result.tables[name]);
-    $("detailed").textContent = result.detailed;
+    renderReports(result);
     renderPython();
     clearStale();
     if (result.changed?.length) flagChanged(result.changed);
+  }
+
+  // Restarts a one-off animation class, so a second change in a row plays it again. Taken off by
+  // time, not by animationend: the children animate for different lengths and the first to end
+  // would cut the others short.
+  function replay(element, name) {
+    element.classList.remove(name);
+    void element.offsetWidth;
+    element.classList.add(name);
+    clearTimeout(element.replayTimer);
+    element.replayTimer = setTimeout(() => element.classList.remove(name), 700);
+  }
+  const barKey = (bar) => ["cx", "cy", "r"].map((name) => bar.getAttribute(name)).join(",");
+
+  // The detailed results: one titled block per report, one card per table. A table of
+  // Variable · Value · Unit reads as a list; a table of checks keeps its header. A result saved
+  // before the tables were sent falls back to the printout.
+  function renderReports(result) {
+    if (!result.reports?.length) {
+      $("detailed").innerHTML = `<pre class="textblock">${escapeHtml(result.detailed)}</pre>`;
+      return;
+    }
+    const mark = (value) => {
+      const [kind, icon, word] = value === "✅" ? ["ok", "i-check", t.passes] : value === "❌" ? ["bad", "i-cross", t.fails] : [];
+      return kind ? `<span class="dtl-mark ${kind}" title="${word}"><svg width="12" height="12" aria-hidden="true"><use href="#${icon}"/></svg>`
+        + `<span class="vh">${word}</span></span>` : null;
+    };
+    const cellHtml = (value) => mark(value) ?? escapeHtml(value);
+    const card = (table) => {
+      if (table.columns.length <= 3) {
+        const rows = table.rows.map(([name, symbol, value, unit]) => {
+          const state = symbol === "DCR" ? dcrState(Number(value)) : "";
+          return `<tr${state ? ' class="is-dcr"' : ""}><th scope="row">${escapeHtml(name)}</th><td class="var">${symbolHtml(symbol)}</td>`
+            + `<td class="val${state ? ` dcr ${state}` : ""}">${cellHtml(value)}</td><td class="unit">${cellHtml(unit)}</td></tr>`;
+        }).join("");
+        return `<div class="dtl-card"><div class="dtl-t">${escapeHtml(table.title)}</div><table class="dtl-tb"><tbody>${rows}</tbody></table></div>`;
+      }
+      // A table of checks: the value with its unit, the limits, and whether it holds. Where a limit
+      // is not met mento writes the clause instead of ✅; it shows as a warning, as the notice does.
+      const [, value, min, max, ok] = table.columns;
+      const head = `<thead><tr><th></th><th>${escapeHtml(value)}</th><th>${escapeHtml(min)}</th><th>${escapeHtml(max)}</th>`
+        + `<th>${escapeHtml(ok)}</th></tr></thead>`;
+      const rows = table.rows.map(([name, unit, val, low, high, holds]) => {
+        const status = mark(holds)
+          ?? (holds ? `<span class="dtl-mark warn"><svg width="12" height="12" aria-hidden="true"><use href="#i-warn"/></svg>${escapeHtml(holds)}</span>` : "");
+        // each cell names its column too: on a phone the header goes and the row folds in two
+        const cell = (label, html) => `<td class="val" data-label="${escapeHtml(label)}">${html}</td>`;
+        return `<tr><th scope="row">${escapeHtml(name)}</th>${cell(value, `${cellHtml(val)} <span class="unit">${escapeHtml(unit)}</span>`)}`
+          + `${cell(min, escapeHtml(low))}${cell(max, escapeHtml(high))}<td class="ok">${status}</td></tr>`;
+      }).join("");
+      return `<div class="dtl-card dtl-card--checks"><div class="dtl-t">${escapeHtml(table.title)}</div>`
+        + `<table class="dtl-tb">${head}<tbody>${rows}</tbody></table></div>`;
+    };
+    $("detailed").innerHTML = result.reports.map((report) => `<section class="dtl-report"><h3 class="dtl-h">${escapeHtml(sentence(report.title))}</h3>`
+      + `<div class="dtl-grid">${report.tables.map(card).join("")}</div></section>`).join("");
   }
 
   function renderError(result) {
@@ -383,11 +494,23 @@ export async function start(spec) {
 
   function noticeText(item) {
     const values = item.values || {};
-    if (item.code === "mento") return `<b>${t.notice}</b> ${values.message}`;
+    const lead = `<b>${item.severity === "bad" ? t.notice_bad : t.notice}</b>`;
+    if (item.code === "mento") return `${lead} ${values.message}`;
     const face = values.face === "top" ? t.top_l : t.bot_l;
-    return `<b>${t.notice}</b> ${t[item.code]
-      .replace("{face}", face).replace("{A_s}", values.A_s).replace("{limit}", values.limit)}`;
+    // a check of mento's own table: the bound it misses, when it names one
+    const value = Number(values.value);
+    const limit = values.min !== "" && value < Number(values.min) ? ` &lt; ${t.min_short} ${values.min}`
+      : values.max !== "" && value > Number(values.max) ? ` &gt; ${t.max_short} ${values.max}` : "";
+    const fill = {
+      face, A_s: values.A_s, limit: item.code === "mento_check" ? limit : values.limit, combo: values.combo,
+      why: values.why ? t[`why_${values.why}`] : "", value: values.value, min: values.min, unit: values.unit, label: values.label,
+    };
+    return `${lead} ${t[item.code].replace(/\{(\w+)\}/g, (all, key) => fill[key] ?? all)}`;
   }
+
+  // A layout's bars as the page writes them: its first row, and its second under it when it has one.
+  const barsHtml = (option) => (option.rows?.length > 1
+    ? `${option.rows[0]}<span class="l2">${t.layer2} ${option.rows[1]}</span>` : option.bars);
 
   // Station 3, design mode: one group per rebar family, its options inside (3.6).
   function renderGroups(result) {
@@ -400,12 +523,12 @@ export async function start(spec) {
       const isOpen = open.has(key);
       const rows = options.map((option, index) => `
         <label class="opt"><input type="radio" name="g-${key}" value="${option.signature}"${index === selected ? " checked" : ""}>
-          <span class="val">${option.bars}</span><span class="area">${option.area}</span>
+          <span class="val">${barsHtml(option)}</span><span class="area">${option.area}</span>
           <span class="dcr ${dcrState(option.dcr)}">${two(option.dcr)}</span></label>`).join("");
       return `<div class="grp${isOpen ? " is-open" : ""}" data-group="${key}" role="radiogroup" aria-labelledby="g-${key}-label">
         <button class="hd" type="button" aria-expanded="${isOpen}" aria-controls="g-${key}-opts">
           <span class="lbl" id="g-${key}-label">${t[label]}</span>
-          <span class="val">${current.bars}</span><span class="dcr ${dcrState(current.dcr)}">${two(current.dcr)}</span>
+          <span class="val">${barsHtml(current)}</span><span class="dcr ${dcrState(current.dcr)}">${two(current.dcr)}</span>
           <span class="chev" aria-hidden="true">${isOpen ? "▾" : "▸"}</span></button>
         <div id="g-${key}-opts"${isOpen ? "" : " hidden"}>${rows}</div></div>`;
     }).join("");
@@ -434,7 +557,7 @@ export async function start(spec) {
     $(`table-${name}`).innerHTML = `<table class="df"><thead><tr>${header}</tr></thead><tbody>${rows}</tbody></table>`;
   }
 
-  const renderPython = () => { $("python").textContent = spec.python(state, lastResult, t); };
+  const renderPython = () => { $("python").innerHTML = highlightPython(spec.python(state, lastResult, t)); };
 
   // ------------------------------------------------------------ stations 1 and 2
   function fillSelect(select, options, value) {
@@ -586,6 +709,7 @@ export async function start(spec) {
     header.setAttribute("aria-expanded", String(open));
     header.querySelector(".chev").textContent = open ? "▾" : "▸";
     group.querySelector("[id$='-opts']").hidden = !open;
+    if (open && !calm()) replay(group, "is-opening");
   });
   // Picking an option applies it: mento checks the section with that layout in place.
   $("groups").addEventListener("change", (event) => {
@@ -602,7 +726,7 @@ export async function start(spec) {
   });
   $("copy-detailed").addEventListener("click", (event) => {
     event.preventDefault(); event.stopPropagation();
-    copy($("detailed").textContent, t.text_copied);
+    copy(lastResult?.detailed ?? "", t.text_copied);
   });
   $("report").addEventListener("click", downloadReport);
 
@@ -627,6 +751,7 @@ export async function start(spec) {
 
   // Which disclosures are open is this visitor's habit, not part of the design (5.8).
   for (const details of document.querySelectorAll(".disc")) {
+    foldable(details);
     const key = `mento-${spec.module}-${details.id}`;
     try {
       details.open = localStorage.getItem(key) === "1" || (localStorage.getItem(key) === null && details.open);

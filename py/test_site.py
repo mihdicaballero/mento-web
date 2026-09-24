@@ -103,8 +103,8 @@ def test_no_ui_text_outside_the_dictionary(page):
         "4",
         "ACI 318-19 · CIRSOC 201-25 · EN 1992",
     }
-    # API names (node.check_flexure(), pip install mento) are code, not copy: the design system
-    # puts them in the disclosure headers exactly as mento spells them.
+    # API names (pip install mento, node.check()) are code, not copy: the home's Python section
+    # shows them exactly as mento spells them. The calculators no longer do; they are for the end user.
     api = re.compile(r"(node|beam|slab|wall)(_1)?\.\w+(\(\))?|pip install mento")
     beams = re.compile(r"V\d{3}")  # element labels, as in an Excel of beams
     loose = {

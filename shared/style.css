@@ -538,3 +538,287 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
   .pysec{gap:28px} .ladder li{padding:14px 0}
   .further-grid{margin-top:16px;gap:12px} .fcard{padding:20px}
 }
+
+/* ---------- 8. DESIGN SYSTEM v2 · appended, v1 above stays as it was ----------
+   Técnico y sobrio, con profundidad: the stations become panels, controls get softer frames and a
+   single focus ring, the verdict and the drawing read clearer. Light only: calculation software is
+   read on white. Every rule here comes after v1 and wins by order, so where a v1 state (disabled,
+   invalid, the dark code block) is more specific it is restated below. */
+:root{
+  --ink:#15181d; --ink-2:#586270;
+  --line:#d2d9e1; --line-2:#e0e5eb; --line-3:#edf0f3;
+  --surface-2:#f4f6f8; --surface-3:#eceff3;
+  --line-hover:#b9c2cd;
+  --r-1:6px; --r-2:10px; --r-3:14px;
+  --sh-1:0 1px 2px rgba(15,23,42,.05);
+  --sh-card:0 1px 2px rgba(15,23,42,.04),0 4px 14px -6px rgba(15,23,42,.10);
+  --sh-pop:0 16px 40px -12px rgba(15,23,42,.25),0 2px 6px rgba(15,23,42,.06);
+  --ring:0 0 0 3px rgba(72,144,210,.22);
+  --ring-bad:0 0 0 3px rgba(180,35,24,.16);
+  --grid-dot:#dfe4ea;
+  --t-fast:140ms; --t-base:240ms;
+}
+/* the tokens above re-set the durations, so the reduced-motion zero has to follow them */
+@media (prefers-reduced-motion:reduce){ :root{ --t-fast:0ms; --t-base:0ms; } }
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+.lbl{letter-spacing:.06em}
+
+/* header: sticky and translucent on desktop */
+.top{position:sticky;top:0;z-index:20;height:56px;border-bottom-color:var(--line-2);
+  background:color-mix(in srgb,var(--surface) 82%,transparent);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px)}
+.top .title{font-weight:500;white-space:nowrap}
+/* .sub is also the math subscript class, with line-height:0: a subtitle that wrapped printed its two
+   lines on top of each other (the home at ~780 px). Now a pill that never wraps, and leaves when short of room */
+.top .sub{white-space:nowrap;line-height:1.5;vertical-align:baseline;padding:1px 8px;border-radius:999px;background:var(--surface-3);font-size:11.5px}
+.top nav a{color:var(--ink-2);font-weight:500;transition:color var(--t-fast) var(--ease)}
+.top nav a:hover{color:var(--ink)}
+@container calc (max-width:960px){ .top .sub{display:none} }
+
+/* stations as panels. Their padding comes out of the gaps (14 px, v1 had 20), so the result card
+   keeps v1's width (~430 px at 1360) and the insides stay close to v1's stations (226 · 300 · 282) */
+@container calc (min-width:721px){
+  .stations{gap:14px;padding-top:24px}
+  .station-1,.station-2,.station-3{background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card);padding:2px 12px 12px}
+}
+@container calc (min-width:1080px){ .stations{grid-template-columns:252px 326px 308px minmax(0,1fr)} }
+.st{border-bottom:var(--bw) solid var(--line-3);padding:14px 0 12px;font-weight:600;color:var(--ink)}
+.st b{background:var(--brand-soft);color:var(--brand-ink);box-shadow:inset 0 0 0 1px var(--brand-line);width:20px;height:20px;border-radius:6px;font-family:var(--font-mono);font-weight:500}
+
+/* fields: one focus mark per control, the frame's ring. v1's global :focus-visible also ringed the
+   bare <input>/<select> inside the frame, a second blue rectangle within the first */
+.field .in,.cell,.bars .n .i{border-radius:var(--r-1);border-color:var(--line);box-shadow:var(--sh-1)}
+.field .in:hover,.cell:hover{border-color:var(--line-hover)}
+.field .in:focus-within,.cell:focus-within,.bars .n .i:focus-visible{border-color:var(--brand);box-shadow:var(--ring)}
+.field .in :is(input,select):focus-visible,.cell input:focus-visible{box-shadow:none;outline:none}
+.field.is-invalid .in,.field[aria-invalid="true"] .in,.cell.is-invalid,.bars .n .i.is-invalid{border-color:var(--bad);box-shadow:var(--ring-bad)}
+.field.is-disabled .in{background:var(--surface-3);border-color:var(--line-3);box-shadow:none}
+.field .in.sel::after{content:"";width:12px;height:12px;flex-shrink:0;background:var(--ink-2);transition:transform var(--t-base) var(--ease);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M3 4.5l3 3 3-3' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+/* the open list: a styled panel where the browser supports customizable <select> (Chrome and Edge
+   135+) with a fine pointer. Phones keep the system picker, the better one there; Firefox and Safari
+   keep the native list. Nothing breaks, it is only plainer */
+@supports (appearance:base-select){
+  @media (hover:hover) and (pointer:fine){
+    .field .in.sel select,.field .in.sel select::picker(select){appearance:base-select}
+    .field .in.sel select{border:0;background:transparent;padding:0;min-block-size:0;height:100%;display:flex;align-items:center;cursor:pointer;color:var(--ink)}
+    .field .in.sel select::picker-icon{display:none}
+    .field .in.sel:has(select:open){border-color:var(--brand);box-shadow:var(--ring)}
+    .field .in.sel:has(select:open)::after{transform:rotate(180deg)}
+    .field .in.sel select::picker(select){margin:6px 0 0 -9px;min-inline-size:calc(anchor-size(self-inline) + 30px);padding:4px;
+      border:var(--bw) solid var(--line-2);border-radius:var(--r-2);background:var(--surface);box-shadow:var(--sh-pop);
+      opacity:0;translate:0 -4px;transition:opacity .16s var(--ease),translate .16s var(--ease),display .16s allow-discrete,overlay .16s allow-discrete}
+    .field .in.sel select:open::picker(select){opacity:1;translate:0 0}
+    @starting-style{ .field .in.sel select:open::picker(select){opacity:0;translate:0 -4px} }
+    .field .in.sel option{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--r-1);font-size:var(--fs-14);color:var(--ink);cursor:pointer;transition:background var(--t-fast) var(--ease)}
+    .field .in.sel option:hover,.field .in.sel option:focus-visible{background:var(--surface-2);outline:none;box-shadow:none}
+    .field .in.sel option:checked{background:var(--brand-soft);font-weight:500}
+    .field .in.sel option::checkmark{order:1;margin-left:auto;content:"";width:14px;height:14px;background:var(--brand-ink);
+      -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat;
+              mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M3 7.5l2.5 2.5L11 4.5' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/14px no-repeat}
+    @media (prefers-reduced-motion:reduce){ .field .in.sel select::picker(select){transition:none} }
+  }
+}
+
+/* segmented: a track with a raised thumb */
+.seg{background:var(--surface-3);border:var(--bw) solid var(--line-2);border-radius:8px;padding:2px;gap:2px}
+.seg button{background:transparent;color:var(--ink-2);border-radius:6px;font-weight:500;transition:background var(--t-fast) var(--ease),color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease)}
+.seg button + button{border-left:0}
+.seg button:hover{background:transparent;color:var(--ink)}
+.seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.12),0 0 0 1px rgba(15,23,42,.05)}
+
+/* rebar groups: the chosen option's DCR as a pill */
+.grp{border-color:var(--line-2);border-radius:8px;box-shadow:var(--sh-1);overflow:hidden}
+.grp .hd{grid-template-columns:70px minmax(0,1fr) auto 12px;border-radius:0;transition:background var(--t-base) var(--ease)}
+.grp .hd .dcr{justify-self:end;font-size:var(--fs-12);font-weight:500;padding:1px 7px;border-radius:999px}
+.grp .hd .dcr.ok{background:var(--ok-soft);color:var(--ok-ink)}
+.grp .hd .dcr.warn{background:var(--warn-soft);color:var(--warn-ink)}
+.grp .hd .dcr.bad{background:var(--bad-soft);color:var(--bad-ink)}
+.opt{transition:background var(--t-fast) var(--ease)}
+.opt.is-selected,.opt:has(input:checked){box-shadow:inset 2px 0 0 var(--brand)}
+
+/* result card: the governing DCR captioned above its number, a halo on the mark */
+.card{border-color:var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card);overflow:hidden}
+.verdict{padding:18px var(--s-4) 16px;border-radius:0;transition:background-color var(--t-base) var(--ease)}
+.verdict .mark{width:36px;height:36px;transition:background-color var(--t-base) var(--ease),box-shadow var(--t-base) var(--ease)}
+.verdict[data-state="ok"] .mark{box-shadow:0 0 0 5px var(--ok-line)}
+.verdict[data-state="warn"] .mark{box-shadow:0 0 0 5px var(--warn-line)}
+.verdict[data-state="bad"] .mark{box-shadow:0 0 0 5px var(--bad-line)}
+.verdict .word{font-size:21px;letter-spacing:-.01em}
+.verdict .dcr-max{margin-left:auto;display:inline-flex;flex-direction:column;align-items:flex-end;gap:5px}
+.verdict .dcr-max .cap{font-size:10.5px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;line-height:1;opacity:.75}
+.verdict .readout{margin-left:0;font-size:36px}
+.verdict[data-state="ok"] .dcr-max{color:var(--ok-ink)} .verdict[data-state="warn"] .dcr-max{color:var(--warn-ink)} .verdict[data-state="bad"] .dcr-max{color:var(--bad-ink)}
+.ledger .row{padding:14px var(--s-4);gap:10px 12px}
+.ledger .name{font-weight:600;font-size:13.5px}
+.ledger .detail{margin-top:2px}
+.ledger .dcr{font-size:var(--fs-15)}
+.meter{height:6px;border-radius:999px}
+.meter i{border-radius:999px}
+.meter s{top:-3px;bottom:-3px;width:2px;border-radius:1px;background:var(--ink-3);opacity:.55}
+.verdict-card .notice{margin:12px var(--s-4) 2px;border:var(--bw) solid;border-radius:8px}
+.verdict-card .notice--warn{border-color:var(--warn-line)} .verdict-card .notice--bad{border-color:var(--bad-line)}
+.actions{padding:14px var(--s-4) 6px}
+
+/* buttons */
+.btn{border-radius:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.14),0 1px 2px rgba(15,23,42,.18);transition:background var(--t-fast) var(--ease),border-color var(--t-fast) var(--ease),box-shadow var(--t-fast) var(--ease),transform var(--t-fast) var(--ease)}
+.btn:active{transform:translateY(1px)}
+.btn--sec{background:var(--surface);color:var(--ink);border-color:var(--line);box-shadow:var(--sh-1)}
+.btn--sec svg{color:var(--brand-ink)}
+.btn--sec:hover{background:var(--surface-2);border-color:var(--line-hover)}
+.btn--sec:active{background:var(--surface-3)}
+a.btn--sec:hover,a.btn--sec:active{color:var(--ink)}
+.btn:disabled,.btn:disabled:hover,.btn[aria-disabled="true"]{background:var(--line-3);border-color:var(--line-3);color:var(--ink-3);box-shadow:none;transform:none}
+.btn:disabled svg{color:inherit}
+.disc--code .btn--sec,.disc-wrap > .disc-copy--dark{background:transparent;color:#fff;border-color:#3b4450;box-shadow:none}
+.disc--code .btn--sec svg,.disc-wrap > .disc-copy--dark svg{color:inherit}
+.disc-wrap > .disc-copy--dark:hover{background:#252a30;border-color:#4a5563}
+
+/* drawing: engineering paper, and dimension lines (drawn by each calculator) */
+.drawing{border-color:var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card);
+  background-color:var(--surface);background-image:radial-gradient(circle at 1px 1px,var(--grid-dot) 1px,transparent 0);background-size:14px 14px}
+.dw-concrete{fill:var(--surface-3);stroke:var(--ink-2);stroke-width:1.2}
+.dw-dl{stroke:var(--ink-3);stroke-width:1;fill:none}
+.dw-dt{fill:var(--ink-2);font-family:var(--font-mono);font-size:12px}
+
+/* below: disclosures and tables */
+.disc{border:var(--bw) solid var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card);overflow:hidden}
+.disc summary{padding:14px var(--s-4);transition:background var(--t-fast) var(--ease)}
+.disc summary::before{content:"";width:12px;height:12px;flex-shrink:0;background:var(--ink-2);transition:transform var(--t-base) var(--ease);
+  -webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4.5 3l3 3-3 3' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat;
+          mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M4.5 3l3 3-3 3' fill='none' stroke='black' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/12px no-repeat}
+.disc[open] summary::before{content:"";transform:rotate(90deg)}
+.disc--code{background:#0f1319;border-color:#0f1319}
+.disc--code summary::before{background:#8b95a1}
+.df th{background:var(--surface-2);border-bottom:var(--bw) solid var(--line-2);padding-top:8px;padding-bottom:8px}
+.df tr:last-child td{border-bottom:0}
+.df tr:hover td{background:var(--brand-soft)}
+.df td.dcr{font-weight:500}
+
+/* boot: a rounded bar with a sheen */
+.progress{height:6px;border-radius:999px}
+.progress i{border-radius:999px;background:linear-gradient(90deg,var(--brand) 0%,#8cc0ec 50%,var(--brand) 100%);background-size:200% 100%;animation:sheen 1.6s linear infinite;transition:width .6s var(--ease)}
+@keyframes sheen{from{background-position:100% 0}to{background-position:-100% 0}}
+.steps li[data-s="doing"]{color:var(--ink);font-weight:500}
+@media (prefers-reduced-motion:reduce){ .progress i{animation:none} }
+
+/* home: its cards get the same depth */
+.ccard,.fcard{border-radius:var(--r-3);box-shadow:var(--sh-card);transition:border-color var(--t-fast) var(--ease),box-shadow var(--t-base) var(--ease)}
+.ccard:hover{box-shadow:0 1px 2px rgba(15,23,42,.04),0 10px 24px -10px rgba(15,23,42,.18)}
+.ccard--soon{box-shadow:none}
+.proof li > *{border-radius:var(--r-2)}
+.viz-draw,.viz-prop,.viz-verdict,.pycode{border-radius:var(--r-3)}
+
+.toast{border-radius:12px}
+.verdict-strip{transition:background-color var(--t-base) var(--ease),border-color var(--t-base) var(--ease)}
+.foot{border-top-color:var(--line-2)}
+
+/* phone: the panels keep their card look, with a 12 px gutter */
+@container calc (max-width:720px){
+  .top{position:static;backdrop-filter:none;-webkit-backdrop-filter:none;background:var(--surface)}
+  /* v1 bug: the grid's align-items:start, kept in the phone's flex column, sized station 3 to its
+     content (~296 px) instead of the screen */
+  .stations{align-items:stretch}
+  .station{margin:12px 12px 0;padding:0 14px 14px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card)}
+  .st{padding:14px 0 10px}
+  .drawing{margin:12px 12px 0;padding:8px 0}
+  .station-4{margin:12px 12px 0}
+  .below{padding:12px 12px 0;gap:12px}
+  .df th:first-child{background:var(--surface-2)}
+  .verdict-strip{backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px)}
+}
+
+/* a face's second row of bars: under the first, in the group headers and options and in check mode */
+.grp .val .l2{display:block;font-family:var(--font-sans);font-size:var(--fs-11);color:var(--ink-2);margin-top:1px}
+.bars--l2 .lbl::before{content:"↳ ";letter-spacing:0}
+.bars--l2 .lbl{white-space:nowrap}
+
+/* detailed results, laid out from mento's printout: one block per report, one card per table.
+   Vertical room lives in the reports, not on the container, so a fold closes all the way */
+.dtl{border-top:var(--bw) solid var(--line-3);padding:0 var(--s-4)}
+.dtl:focus-visible{outline:2px solid var(--brand);outline-offset:-2px;box-shadow:none}
+.dtl-report{padding:14px 0 18px}
+.dtl-report + .dtl-report{border-top:var(--bw) dashed var(--line-2)}
+.dtl-h{font-size:var(--fs-14);font-weight:600;margin:0 0 12px}
+.dtl-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,330px),1fr));gap:12px;align-items:start}
+.dtl-card{border:var(--bw) solid var(--line-2);border-radius:var(--r-2);overflow:hidden;background:var(--surface)}
+.dtl-card--checks{grid-column:1 / -1}
+.dtl-card--checks .dtl-tb tr > :first-child{width:55%}  /* the description takes the spare width, the numbers stay together */
+.dtl-t{padding:9px 12px;background:var(--surface-2);border-bottom:var(--bw) solid var(--line-3);font-size:var(--fs-11);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.dtl-tb{width:100%;border-collapse:collapse;font-size:var(--fs-13)}
+.dtl-tb th,.dtl-tb td{padding:6px 12px;border-bottom:var(--bw) solid var(--line-3);text-align:left;font-weight:400;vertical-align:baseline}
+.dtl-tb tbody tr:last-child > *{border-bottom:0}
+.dtl-tb tbody th{color:var(--ink-2);line-height:1.4}
+.dtl-tb thead th{font-size:var(--fs-11);color:var(--ink-2);font-weight:500;text-align:right;padding-top:8px;padding-bottom:6px;white-space:nowrap}
+.dtl-tb .var{white-space:nowrap;padding-left:4px;padding-right:4px}
+.dtl-tb .var sub{font-size:.75em;line-height:0;vertical-align:-.25em}
+.dtl-tb .val{font-family:var(--font-mono);text-align:right;white-space:nowrap}
+.dtl-tb .unit{color:var(--ink-2);font-size:var(--fs-12);white-space:nowrap;font-family:var(--font-sans)}
+.dtl-tb td.unit{padding-left:4px}
+.dtl-tb .ok{text-align:right;white-space:nowrap}
+.dtl-tb tr.is-dcr > *{background:var(--surface-2);font-weight:600}
+.dtl-tb td.dcr.ok{color:var(--ok)} .dtl-tb td.dcr.warn{color:var(--warn)} .dtl-tb td.dcr.bad{color:var(--bad)}
+.dtl-mark{display:inline-flex;align-items:center;gap:4px;font-family:var(--font-mono);font-size:var(--fs-11);font-weight:500;line-height:1;border-radius:999px;padding:3px 7px;vertical-align:middle}
+.dtl-mark.ok{background:var(--ok-soft);color:var(--ok);padding:3px}
+.dtl-mark.bad{background:var(--bad-soft);color:var(--bad);padding:3px}
+.dtl-mark.warn{background:var(--warn-soft);color:var(--warn-ink);box-shadow:inset 0 0 0 1px var(--warn-line)}
+
+/* phone: a table of checks has no room for five columns. Its header goes and each row folds in
+   two, the description on top and the figures under it, each with its column's name */
+@container calc (max-width:720px){
+  .dtl{padding:0 12px}
+  .dtl-card--checks thead{display:none}
+  .dtl-card--checks .dtl-tb tr{display:grid;grid-template-columns:auto auto auto 1fr;column-gap:16px;padding:8px 12px;border-bottom:var(--bw) solid var(--line-3)}
+  .dtl-card--checks .dtl-tb tbody tr:last-child{border-bottom:0}
+  .dtl-card--checks .dtl-tb tr > *,.dtl-card--checks .dtl-tb tr > :first-child{padding:0;border:0;width:auto}
+  .dtl-card--checks .dtl-tb th{grid-column:1 / -1;margin-bottom:4px}
+  .dtl-card--checks .dtl-tb td.val{text-align:left}
+  .dtl-card--checks .dtl-tb td.val::before{content:attr(data-label);display:block;font-family:var(--font-sans);font-size:10.5px;color:var(--ink-2);margin-bottom:1px}
+  .dtl-card--checks .dtl-tb td:empty{display:none}
+  .dtl-card--checks .dtl-tb td.ok{grid-column:-2;justify-self:end;align-self:end}
+}
+
+/* Python, painted as an editor would on the dark ground (the home's snippet takes the same colours) */
+.codeblock{color:#d6deeb}
+.codeblock .kw{color:#c792ea} .codeblock .str{color:#c3e88d} .codeblock .cm{color:#7f8b99;font-style:italic}
+.codeblock .num{color:#f78c6c} .codeblock .cls{color:#ffcb6b} .codeblock .fn{color:#82aaff} .codeblock .arg{color:#89ddff}
+
+/* ---------- 8b. MOTION · movement that says something changed, never decoration ----------
+   Everything below is CSS or the browser's own animations (shared/ui.js): no library, and every
+   element ends where it should if no frame runs */
+/* first paint: the stations rise in, one after another; `backwards` leaves nothing behind after */
+@keyframes rise{from{opacity:0;transform:translateY(8px)}}
+.station-1,.station-2,.station-3,.station-4,.drawing,.below{animation:rise .45s var(--ease) backwards}
+.station-2{animation-delay:40ms} .station-3{animation-delay:80ms} .station-4{animation-delay:120ms}
+.drawing{animation-delay:160ms} .below{animation-delay:200ms}
+/* the meters grow from their old width to the new one and settle */
+.meter i{transition:width .6s cubic-bezier(.22,1,.36,1)}
+/* the verdict turns (passes ↔ at the limit ↔ does not pass): the mark pops, the word slides in */
+@keyframes mark-pop{0%{transform:scale(.55) rotate(-25deg)}60%{transform:scale(1.1) rotate(0)}100%{transform:none}}
+@keyframes word-in{from{opacity:0;transform:translateX(-6px)}}
+.verdict.is-turning .mark,.verdict-strip.is-turning .mark{animation:mark-pop .5s var(--ease)}
+.verdict.is-turning .word,.verdict-strip.is-turning .word{animation:word-in .3s var(--ease)}
+/* bars that were not in the drawing come in one after another */
+@keyframes bar-in{from{opacity:0;transform:scale(0)}}
+.dw-bar{transform-box:fill-box;transform-origin:center}
+.dw-new{animation:bar-in .4s cubic-bezier(.34,1.56,.64,1) backwards}
+/* a rebar group just opened: its options come in one after another */
+@keyframes opt-in{from{opacity:0;transform:translateY(-4px)}}
+.grp.is-opening .opt{animation:opt-in .25s var(--ease) backwards}
+.grp.is-opening .opt:nth-child(2){animation-delay:30ms} .grp.is-opening .opt:nth-child(3){animation-delay:60ms}
+.grp.is-opening .opt:nth-child(n+4){animation-delay:90ms}
+/* recalculating: a line runs along the card's top edge. It waits 120 ms to show, so a fast
+   calculation does not flicker it on every keystroke */
+.card{position:relative}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;z-index:2;opacity:0;pointer-events:none;
+  background:linear-gradient(90deg,transparent,var(--brand),transparent) no-repeat;background-size:40% 100%;transition:opacity var(--t-fast)}
+.card.is-computing::before{opacity:1;transition-delay:120ms;animation:run 1s linear infinite}
+@keyframes run{from{background-position:-40% 0}to{background-position:140% 0}}
+/* a disclosure folding shut is still [open] until it ends: its chevron turns back at once */
+.disc.is-closing summary::before{transform:none}
+@media (prefers-reduced-motion:reduce){
+  .station-1,.station-2,.station-3,.station-4,.drawing,.below,.dw-new,.grp.is-opening .opt,
+  .verdict.is-turning .mark,.verdict-strip.is-turning .mark,.verdict.is-turning .word,.verdict-strip.is-turning .word,
+  .card.is-computing::before{animation:none}
+  .meter i{transition:none}
+}
