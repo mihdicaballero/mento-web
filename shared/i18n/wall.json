@@ -100,7 +100,12 @@
   "copy_drawing": "Copiá el dibujo de la sección como imagen",
   "image_copied": "Imagen copiada · pegala en tu memoria",
   "image_saved": "Imagen descargada",
-  "image_file": "seccion"
+  "image_file": "seccion",
+  "dcr_max": "DCR máx.",
+  "notice_bad": "No verifica.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "mín.",
+  "max_short": "máx."
  },
  "en": {
   "calc": "Calculators",
@@ -203,6 +208,11 @@
   "copy_drawing": "Copy the section drawing as an image",
   "image_copied": "Image copied · paste it into your report",
   "image_saved": "Image downloaded",
-  "image_file": "section"
+  "image_file": "section",
+  "dcr_max": "Max DCR",
+  "notice_bad": "Fails.",
+  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
+  "min_short": "min.",
+  "max_short": "max."
  }
 }

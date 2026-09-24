@@ -158,20 +158,15 @@ def _ledger(frame: Any, code: str) -> list[dict[str, Any]]:
     ]
 
 
-def _notices(frame: Any, captured: list[Any]) -> list[dict[str, Any]]:
-    """The wall's own minimums: the check table reports the ratios it asks for and the ones placed."""
-    notices = [{"code": "mento", "values": {"message": str(item.message)}} for item in captured]
-    index = _governing(frame)
-    for placed, minimum, direction in (("ρt", "ρt,min", "horizontal"), ("ρl", "ρl,min", "vertical")):
-        value = float(common.row_value(frame, index, placed))
-        limit = float(common.row_value(frame, index, minimum))
-        if value < limit * 0.999:
-            notices.append(
-                {
-                    "code": "rho_below_min",
-                    "values": {"face": direction, "A_s": f"{value:.4f}", "limit": f"{limit:.4f}"},
-                }
-            )
+def _notices(reports: list[dict[str, Any]], captured: list[Any]) -> list[dict[str, Any]]:
+    """mento's warnings and its table of checks. Its first two rows are the ratios of the horizontal
+    and the vertical mesh against their minimums, which have a sentence of their own."""
+    named = {0: ("rho_below_min", "horizontal"), 1: ("rho_below_min", "vertical")}
+    notices = common.captured_notices(captured)
+    for notice in common.check_notices(reports[0], named) if reports else []:
+        if notice["code"] == "rho_below_min":
+            notice["values"].update({"A_s": notice["values"]["value"], "limit": notice["values"]["min"]})
+        notices.append(notice)
     return notices
 
 
@@ -217,7 +212,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
     with warnings.catch_warnings(record=True) as captured:
         warnings.simplefilter("always")
         wall, frame = _checked(data, forces, layouts)
-        detailed = common.printed(wall.shear_results_detailed)
+        detailed = common.detailed(wall.shear_results_detailed)
 
     if not check_mode:
 
@@ -240,10 +235,10 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "selected": selected,
         "changed": changed,
         "ledger": _ledger(frame, data["code"]),
-        "notices": _notices(frame, list(captured)),
+        "notices": _notices(detailed["reports"], list(captured)),
         "tables": {"shear": common.table(frame)},
         "section": _section(wall, layouts),
-        "detailed": detailed,
+        **detailed,
     }
 
 

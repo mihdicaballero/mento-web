@@ -211,7 +211,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         current = {group: round(float(_face(slab, group).DCR), 3) for group in options}
         common.fill_option_dcrs(options, selected, current, evaluate)
 
-    flexure = slab.flexure_design
+    detailed = common.detailed(node.flexure_results_detailed, node.shear_results_detailed)
     return {
         "ok": True,
         "version": mento.__version__,
@@ -222,10 +222,10 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "selected": selected,
         "changed": changed,
         "ledger": _ledger(slab, forces, data["code"]),
-        "notices": common.face_notices([(flexure.bottom, "bottom"), (flexure.top, "top")], list(captured)),
+        "notices": common.flexure_notices(slab, forces, detailed["reports"], list(captured)),
         "tables": {"flexure": common.table(flexure_table), "shear": common.table(shear_table)},
         "section": _section(slab, layouts),
-        "detailed": common.printed(node.flexure_results_detailed, node.shear_results_detailed),
+        **detailed,
     }
 
 

@@ -1,6 +1,6 @@
 // The shear wall: in-plane shear with a horizontal and a vertical mesh, which is what mento
 // checks today. Everything it shares with the other calculators is in shared/calculator.js.
-import { CONCRETE_CLASS, noteRoom, num, start } from "../shared/calculator.js";
+import { CONCRETE_CLASS, dimBelow, dimLeft, num, start } from "../shared/calculator.js";
 
 const EXAMPLE = {
   code: "CIRSOC 201-25", fc: 25, fy: 420, thickness: 20, length: 300, wall_height: 300, cover: 25,
@@ -17,14 +17,15 @@ const EXAMPLE = {
 function drawing(result, t, phone) {
   const { length, thickness, bars } = result.section;
   const box = phone ? { w: 343, h: 210 } : { w: 556, h: 300 };
-  // The "l × t" note needs its room on the left, the frame label its band on top.
+  // Dimension lines need their room on the left and below, the frame label its band on top;
+  // the "l × t" note stays as the figure's description.
   const note = `${length} × ${thickness}`;
-  const room = { left: Math.max(60, noteRoom(note)), right: 24 };
-  const scale = Math.min((box.w - room.left - room.right) / length, (box.h - 90) / thickness, 4);
+  const room = { left: 60, right: 24 };
+  const scale = Math.min((box.w - room.left - room.right) / length, (box.h - 120) / thickness, 4);
   const [w, h] = [length * scale, thickness * scale];
   const x0 = room.left + (box.w - room.left - room.right - w) / 2;
   // centred, but never up into the band of the frame's label and Copiá button
-  const y0 = Math.max((box.h - h) / 2, phone ? 60 : 44);
+  const y0 = Math.max((box.h - h - 50) / 2, phone ? 60 : 44);
   const parts = [`<rect class="dw-concrete" x="${x0}" y="${y0}" width="${w}" height="${h}"/>`];
   for (const bar of bars) {
     parts.push(`<circle class="dw-bar" cx="${(x0 + bar.x * scale).toFixed(2)}"`
@@ -36,7 +37,9 @@ function drawing(result, t, phone) {
   if (result.rebar.vertical) {
     parts.push(`<text class="dw-label" x="${x0}" y="${y0 + h + 22}">${result.rebar.vertical}</text>`);
   }
-  parts.push(`<text class="dw-dim" x="${x0 - 12}" y="${y0 + h / 2}" text-anchor="end">${note}</text>`);
+  // dimension lines: the thickness on the left, the width under the bottom label (its extension
+  // lines start below the label, so they never cross it)
+  parts.push(dimLeft(y0, y0 + h, x0, x0 - 14, `${thickness} cm`), dimBelow(x0, x0 + w, y0 + h + 26, y0 + h + 38, `${length} cm`));
   const description = t.fig_section.replace("{section}", note)
     .replace("{bars}", [result.rebar.horizontal, result.rebar.vertical].filter(Boolean).join(", "));
   return `<svg viewBox="0 0 ${box.w} ${box.h}" width="${box.w}" height="${box.h}" style="max-width:100%;height:auto"`
@@ -51,8 +54,8 @@ function python(state, result) {
     "",
     `concrete = ${concrete}(name="${state.code}", f_c=${state.fc} * MPa)`,
     `steel = SteelBar(name="fy ${state.fy}", f_y=${state.fy} * MPa)`,
-    `wall_1 = ShearWall(label="${state.label}", concrete=concrete, steel_bar=steel, c_c=${num(state.cover)} * mm,`,
-    `                   thickness=${num(state.thickness)} * cm, length=${num(state.length)} * cm,`
+    `wall = ShearWall(label="${state.label}", concrete=concrete, steel_bar=steel, c_c=${num(state.cover)} * mm,`,
+    `                 thickness=${num(state.thickness)} * cm, length=${num(state.length)} * cm,`
     + ` height=${num(state.wall_height)} * cm)`,
     "forces = [",
     ...state.forces.filter((force) => num(force.M_y) || num(force.V_z) || num(force.N_x)).map((force) =>
@@ -65,22 +68,22 @@ function python(state, result) {
     ? { horizontal: mesh(state.rebar.horizontal), vertical: mesh(state.rebar.vertical) }
     : result?.layouts;
   if (state.mode === "design") {
-    lines.push("# Let mento design the mesh", "wall_1.design_shear(forces)");
+    lines.push("# Let mento design the mesh", "wall.design_shear(forces)");
   } else if (layouts) {
     lines.push("# Set the mesh");
-    if (layouts.horizontal) lines.push(`wall_1.set_horizontal_rebar(d_b=${layouts.horizontal.d} * mm, s=${layouts.horizontal.s} * cm)`);
-    if (layouts.vertical) lines.push(`wall_1.set_vertical_rebar(d_b=${layouts.vertical.d} * mm, s=${layouts.vertical.s} * cm)`);
+    if (layouts.horizontal) lines.push(`wall.set_horizontal_rebar(d_b=${layouts.horizontal.d} * mm, s=${layouts.horizontal.s} * cm)`);
+    if (layouts.vertical) lines.push(`wall.set_vertical_rebar(d_b=${layouts.vertical.d} * mm, s=${layouts.vertical.s} * cm)`);
   }
   return lines.concat([
     "",
     "# Perform all checks",
-    "wall_1.check(forces)",
+    "wall.check(forces)",
     "# Print results in Markdown format",
-    "wall_1.results",
+    "wall.results",
     "# Print shear results in more detailed format in a DataFrame",
-    "wall_1.check_shear(forces)",
+    "wall.check_shear(forces)",
     "# View detailed shear results",
-    "wall_1.shear_results_detailed()",
+    "wall.shear_results_detailed()",
   ]).join("\n");
 }
 
@@ -108,6 +111,8 @@ start({
   },
   tables: ["shear"],
   drawing,
+  // the section as typed, before the first result: its bars come in with it
+  preview: (state) => ({ section: { length: num(state.length), thickness: num(state.thickness), cover: num(state.cover) / 10, bars: [] }, rebar: {} }),
   python,
   barsFromLayouts,
 });

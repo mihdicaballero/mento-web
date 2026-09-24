@@ -4,6 +4,7 @@ import base64
 import io
 import json
 
+import common
 import docx
 import pytest
 
@@ -48,6 +49,75 @@ def test_section_moves_bars_that_do_not_fit_to_a_second_row():
     assert result["ok"], result
     bottom = [bar for bar in result["section"]["bars"] if bar["y"] < result["section"]["height"] / 2]
     assert len({bar["y"] for bar in bottom}) == 2, result["flexure"]["bottom"]["bars"]
+
+
+def test_a_designed_second_row_stays_in_the_second_row():
+    # mento puts 2Ø10 in each row here (n_1 and n_3); listed without the empty n_2 they would
+    # read as 4Ø10 in the first row, which does not fit a 12 cm web
+    result = solve(width=12, height=30, forces=[{"label": "U", "M_y": 40, "V_z": 50}])
+    assert result["layouts"]["bot"] == {"n1": 2, "d1": 10.0, "n3": 2, "d3": 10.0}
+    assert result["rows"]["bot"] == ["2Ø10", "2Ø10"]
+    assert [label["bars"] for label in result["section"]["labels"]["bot"]] == ["2Ø10", "2Ø10"]
+    assert not any(notice["code"] == "spacing" for notice in result["notices"])
+
+
+def test_check_mode_takes_a_second_row_on_each_face():
+    rebar = {
+        "bot": {"n1": 3, "d1": 20, "n3": 2, "d3": 16},
+        "top": {"n1": 2, "d1": 12, "n3": 2, "d3": 10},
+        "stirrups": {"n": 1, "d": 8, "s": 15},
+    }
+    result = solve(mode="check", rebar=rebar, width=20, height=40)
+    assert result["layouts"]["bot"] == {"n1": 3, "d1": 20.0, "n3": 2, "d3": 16.0}
+    assert result["rows"] == {"bot": ["3Ø20", "2Ø16"], "top": ["2Ø12", "2Ø10"], "st": ["1eØ8/15 cm"]}
+    first, second = (label["y"] for label in result["section"]["labels"]["bot"])
+    assert second - first > 2  # the second row sits a bar and a row gap above the first
+
+
+def test_bars_that_do_not_fit_one_row_fail_as_mento_says():
+    rebar = {
+        "bot": {"n1": 3, "d1": 20, "n2": 2, "d2": 16},
+        "top": {"n1": 2, "d1": 12},
+        "stirrups": {"n": 1, "d": 8, "s": 15},
+    }
+    result = solve(mode="check", rebar=rebar, width=20, height=40, forces=[{"label": "U", "M_y": 60, "V_z": 50}])
+    spacing = [notice for notice in result["notices"] if notice["code"] == "spacing"]
+    assert spacing and spacing[0]["severity"] == "bad" and spacing[0]["values"]["face"] == "bottom"
+
+
+DOUBLY = {
+    "width": 20,
+    "height": 40,
+    "forces": [{"label": "U1", "M_y": 150, "V_z": 50}, {"label": "U2", "M_y": -20, "V_z": 40}],
+}
+
+
+def test_a_doubly_reinforced_design_is_not_flagged_above_the_maximum():
+    result = solve(**DOUBLY)
+    bottom = result["flexure"]["bottom"]
+    assert float(bottom["A_s"].split()[0]) > float(bottom["A_s_max"].split()[0])  # past the singly reinforced limit
+    assert not any(notice["code"] == "as_above_max" for notice in result["notices"])  # mento: ✅ D.R.
+    assert not any(notice["code"] == "as_short" for notice in result["notices"])  # its top covers the compression
+
+
+def test_top_steel_short_of_the_compression_a_doubly_reinforced_beam_needs_fails():
+    rebar = {
+        "bot": {"n1": 3, "d1": 20, "n3": 2, "d3": 16},
+        "top": {"n1": 2, "d1": 10},
+        "stirrups": {"n": 1, "d": 8, "s": 15},
+    }
+    result = solve(mode="check", rebar=rebar, **DOUBLY)
+    (top,) = [
+        notice for notice in result["notices"] if notice["code"] == "as_short" and notice["values"]["face"] == "top"
+    ]
+    assert top["severity"] == "bad"
+    # U2's negative moment asks less of the top than U1's positive one does as compression steel
+    assert top["values"]["why"] == "compression" and top["values"]["combo"] == "U1"
+    assert float(top["values"]["limit"].split()[0]) > 1.99
+
+
+def test_the_worked_example_has_no_errors():
+    assert not [notice for notice in solve()["notices"] if notice["severity"] == "bad"]
 
 
 def test_check_mode_reports_insufficient_rebar():
@@ -145,6 +215,33 @@ def test_tables_keep_mentos_columns_with_the_units_in_the_header():
     assert flexure["units"][3] == "cm²"
     assert len(flexure["rows"]) == len(beam.EXAMPLE["forces"])
     assert tables["shear"]["columns"][-1] == "DCR"
+
+
+def test_detailed_results_come_as_tables_too():
+    result = solve(lang="en")
+    flexure, shear = result["reports"]
+    assert flexure["title"] == "BEAM FLEXURE DETAILED RESULTS"
+    assert [table["title"] for table in flexure["tables"]][:3] == ["Materials", "Geometry", "Design forces"]
+    materials = flexure["tables"][0]
+    assert materials["columns"] == ["Variable", "Value", "Unit"]
+    assert ["Concrete strength", "fc", "25.0", "MPa"] in materials["rows"]
+    check = flexure["tables"][3]
+    assert check["columns"] == ["Unit", "Value", "Min.", "Max.", "Ok?"]
+    assert all(len(row) == 6 for row in check["rows"])
+    assert shear["tables"][-1]["rows"][-1][1:3] == ["DCR", "0.81"]
+    assert "BEAM FLEXURE DETAILED RESULTS" in result["detailed"]  # the text stays, for Copiá
+
+
+def test_a_printed_table_is_cut_where_each_column_starts():
+    text = "===== T =====\nName      Variable    Value  Unit\n--------  ----------  -----  ----\nWidth         b          20  cm\nCheck                    ✅\n\n"
+    (report,) = common.reports(text)
+    assert report["tables"] == [
+        {
+            "title": "Name",
+            "columns": ["Variable", "Value", "Unit"],
+            "rows": [["Width", "b", "20", "cm"], ["Check", "", "✅", ""]],
+        },
+    ]
 
 
 def test_check_mode_has_no_options():

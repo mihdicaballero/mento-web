@@ -8,8 +8,6 @@ be exercised from a normal interpreter too::
 
 from __future__ import annotations
 
-import contextlib
-import io
 import json
 import math
 import warnings
@@ -123,72 +121,81 @@ def _build_forces(data: dict[str, Any]) -> list[Forces]:
     return forces
 
 
-def _rows(layers: Any, room: float, gap: float) -> list[list[Any]]:
-    """Split the bar groups of one face into rows, nearest the face first.
+def _rows(layout: dict[str, Any]) -> list[list[tuple[int, float]]]:
+    """The bar groups of one face as rows, nearest the face first: ``(n, d in cm)`` pairs.
 
-    mento lists up to four groups, corner and inner bars of the first row and then of the
-    second, but leaves out the empty ones. So whether the second group shares the first row
-    is decided by whether it fits between the stirrup legs.
+    A layout names the row of every group, as mento's setters do: n1 and n2 are the corner and
+    the inner bars of the first row, n3 and n4 those of the second.
     """
-    groups = list(layers)
-    if len(groups) == 4:
-        return [groups[:2], groups[2:]]
-    if len(groups) < 2:
-        return [groups]
-    first = groups[:2]
-    bars = sum(group.n for group in first)
-    diameters = [float(group.d_b.to("cm").magnitude) for group in first]
-    needed = sum(group.n * d for group, d in zip(first, diameters)) + (bars - 1) * max(gap, *diameters)
-    if needed <= room + 1e-6:
-        return [first, groups[2:]] if len(groups) > 2 else [first]
-    return [groups[:1], groups[1:]]
+    rows = []
+    for first, second in ((1, 2), (3, 4)):
+        row = [
+            (int(layout[f"n{index}"]), float(layout[f"d{index}"]) / 10)
+            for index in (first, second)
+            if layout.get(f"n{index}") and layout.get(f"d{index}")
+        ]
+        if row:
+            rows.append(row)
+    return rows
 
 
-def _section(beam: RectangularBeam) -> dict[str, Any]:
-    """Section geometry in cm, origin at the bottom left corner, for the page to draw."""
+def _section(beam: RectangularBeam, layouts: dict[str, Any]) -> dict[str, Any]:
+    """Section geometry in cm, origin at the bottom left corner, for the page to draw, with a
+    label for every row of bars at that row's height."""
     width = float(beam.width.to("cm").magnitude)
     height = float(beam.height.to("cm").magnitude)
     cover = float(beam.c_c.to("cm").magnitude)
     transverse = beam.reinforcement.transverse
     stirrup = float(transverse.d_b.to("cm").magnitude) if transverse.n_stirrups else 0.0
     edge = cover + stirrup
-    gap = float(beam.settings.clear_spacing.to("cm").magnitude)
     row_gap = float(beam.settings.layers_spacing.to("cm").magnitude)
     bend = 0.43 * stirrup
 
     bars: list[dict[str, float]] = []
+    labels: dict[str, list[dict[str, Any]]] = {"bot": [], "top": []}
 
-    def place(layers: Any, bottom: bool) -> None:
+    def place(layout: dict[str, Any], bottom: bool) -> None:
         offset = edge
-        for row in _rows(layers, width - 2 * edge, gap):
-            if not row:
-                continue
-            tallest = max(float(group.d_b.to("cm").magnitude) for group in row)
-            for position, group in enumerate(row):
-                d = float(group.d_b.to("cm").magnitude)
+        for row in _rows(layout):
+            tallest = max(d for _, d in row)
+            centre = offset + tallest / 2
+            labels["bot" if bottom else "top"].append(
+                {"y": round(centre if bottom else height - centre, 3), "bars": _group_bars(row)}
+            )
+            for position, (n, d) in enumerate(row):
                 y = offset + d / 2 if bottom else height - offset - d / 2
                 span = width - 2 * edge - d
-                for i in range(group.n):
+                for i in range(n):
                     nudge_x = nudge_y = 0.0
                     if position == 0:  # corner bars, spread from leg to leg
-                        x = width / 2 if group.n == 1 else edge + d / 2 + i * span / (group.n - 1)
-                        if group.n > 1 and i in (0, group.n - 1):  # sit in the stirrup bend, as beam.plot() does
+                        x = width / 2 if n == 1 else edge + d / 2 + i * span / (n - 1)
+                        # the first row's corners sit in the stirrup bend, as beam.plot() does
+                        if n > 1 and i in (0, n - 1) and offset == edge:
                             nudge_x = bend if i == 0 else -bend
                             nudge_y = bend if bottom else -bend
                     else:  # inner bars, evenly between the corners
-                        x = edge + d / 2 + (i + 1) * span / (group.n + 1)
+                        x = edge + d / 2 + (i + 1) * span / (n + 1)
                     bars.append({"x": round(x + nudge_x, 3), "y": round(y + nudge_y, 3), "d": round(d, 3)})
             offset += tallest + row_gap
 
-    place(beam.reinforcement.bottom.layers, bottom=True)
-    place(beam.reinforcement.top.layers, bottom=False)
+    place(layouts.get("bot") or {}, bottom=True)
+    place(layouts.get("top") or {}, bottom=False)
     return {
         "width": width,
         "height": height,
         "cover": cover,
         "stirrups": {"n": int(transverse.n_stirrups or 0), "d": stirrup},
         "bars": bars,
+        "labels": labels,
     }
+
+
+def _group_bars(row: list[tuple[int, float]]) -> str:
+    """``2Ø16 + 1Ø12`` for one row: bars of one diameter counted together."""
+    counts: dict[float, int] = {}
+    for n, d in row:
+        counts[d * 10] = counts.get(d * 10, 0) + n
+    return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
 
 
 def _cell(value: Any) -> str:
@@ -213,14 +220,6 @@ def _table(frame: Any) -> dict[str, Any]:
         "rows": rows,
         "dcr": columns.index("DCR") if "DCR" in columns else None,
     }
-
-
-def _detailed_text(node: Node) -> str:
-    out = io.StringIO()
-    with contextlib.redirect_stdout(out):
-        node.flexure_results_detailed()
-        node.shear_results_detailed()
-    return out.getvalue()
 
 
 def _bars(layers: Any) -> str:
@@ -286,12 +285,13 @@ def _rebar_layouts(rebar: dict[str, Any]) -> dict[str, Any]:
     """What the user typed in check mode, in the same shape."""
 
     def face(values: dict[str, Any]) -> dict[str, Any]:
+        """n1 + n2 in the first row, n3 + n4 in the second, as the page and mento number them."""
         layout: dict[str, Any] = {}
-        for index, (count, diameter) in enumerate([("n1", "d1"), ("n2", "d2")], start=1):
-            n = int(values.get(count) or 0)
+        for index in range(1, 5):
+            n = int(values.get(f"n{index}") or 0)
             if n:
                 layout[f"n{index}"] = n
-                layout[f"d{index}"] = float(values.get(diameter) or 0)
+                layout[f"d{index}"] = float(values.get(f"d{index}") or 0)
         return layout
 
     bottom = face(rebar.get("bot") or {})
@@ -326,6 +326,13 @@ def _layout_bars(layout: dict[str, Any]) -> str:
     return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
 
 
+def _layout_rows(layout: dict[str, Any]) -> list[str]:
+    """The bars of a face, one string per row: ``["2Ø16 + 1Ø12", "2Ø12"]``."""
+    if not layout or "n" in layout:
+        return [_layout_bars(layout)] if layout else []
+    return [_group_bars(row) for row in _rows(layout)]
+
+
 def _layout_area(layout: dict[str, Any]) -> str:
     """The steel a layout puts in: cm² on a face, cm²/m of stirrups."""
     if not layout:
@@ -355,10 +362,19 @@ def _apply_layouts(beam: RectangularBeam, layouts: dict[str, Any]) -> None:
 
 
 def _current_layouts(beam: RectangularBeam) -> dict[str, Any]:
+    """What the design left on the beam. ``reinforcement`` lists only the groups that carry bars,
+    so a second row with no inner bars in the first would read as the first row's inner bars.
+    The designer's own row (``flexure_design_results_*``, n_1 to n_4) keeps each in its row."""
     reinforcement = beam.reinforcement
+
+    def face(results: Any, layers: Any) -> dict[str, Any]:
+        if results is not None:
+            return _row_layout(results.to_dict())
+        return _layers_layout(layers)
+
     return {
-        "bot": _layers_layout(reinforcement.bottom.layers),
-        "top": _layers_layout(reinforcement.top.layers),
+        "bot": face(getattr(beam, "flexure_design_results_bot", None), reinforcement.bottom.layers),
+        "top": face(getattr(beam, "flexure_design_results_top", None), reinforcement.top.layers),
         "st": _stirrup_layout(reinforcement.transverse),
     }
 
@@ -456,6 +472,7 @@ def _options(beam: RectangularBeam, layouts: dict[str, Any], limit: int = 3) -> 
         group: [
             {
                 "bars": _layout_bars(layout),
+                "rows": _layout_rows(layout),
                 "area": _layout_area(layout),
                 "signature": _signature(layout),
                 "layout": layout,
@@ -554,27 +571,6 @@ def _ledger(beam: RectangularBeam, forces: list[Forces], code: str) -> list[dict
     return rows
 
 
-def _below(value: Any, limit: Any, slack: float) -> bool:
-    if value is None or limit is None:
-        return False
-    return float(value.to(limit.units).magnitude) < float(limit.magnitude) * slack
-
-
-def _notices(beam: RectangularBeam, captured: list[Any]) -> list[dict[str, Any]]:
-    """What mento flags about detailing: everything it raises as a warning, plus the minimums and
-    maximums its public results expose. mento has no structured warning list yet, so the codes are
-    named here and the page writes the sentence."""
-    notices = [{"code": "mento", "values": {"message": str(item.message)}} for item in captured]
-    for face, name in ((beam.flexure_design.bottom, "bottom"), (beam.flexure_design.top, "top")):
-        if _below(face.A_s, face.A_s_min, 0.999):
-            values = {"face": name, "A_s": _quantity(face.A_s, "cm**2"), "limit": _quantity(face.A_s_min, "cm**2")}
-            notices.append({"code": "as_below_min", "values": values})
-        if face.A_s_max is not None and _below(face.A_s_max, face.A_s, 1.0):
-            values = {"face": name, "A_s": _quantity(face.A_s, "cm**2"), "limit": _quantity(face.A_s_max, "cm**2")}
-            notices.append({"code": "as_above_max", "values": values})
-    return notices
-
-
 def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
@@ -605,17 +601,19 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
 
     flexure = beam.flexure_design
     shear = beam.shear_design
+    detailed = common.detailed(node.flexure_results_detailed, node.shear_results_detailed)
     return {
         "ok": True,
         "version": mento.__version__,
         "code": data["code"],
         "rebar": {group: _layout_bars(layout) for group, layout in layouts.items()},
+        "rows": {group: _layout_rows(layout) for group, layout in layouts.items()},
         "layouts": layouts,
         "options": options,
         "selected": selected,
         "changed": changed,
         "ledger": _ledger(beam, forces, data["code"]),
-        "notices": _notices(beam, list(captured)),
+        "notices": common.flexure_notices(beam, forces, detailed["reports"], list(captured)),
         "flexure": {"bottom": _face(flexure.bottom), "top": _face(flexure.top)},
         "shear": {
             "stirrups": _layout_bars(layouts.get("st") or {}),
@@ -626,8 +624,8 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
             "enough": _covers(shear.A_v, getattr(shear, "A_v_req", None)),
         },
         "tables": {"flexure": _table(flexure_table), "shear": _table(shear_table)},
-        "section": _section(beam),
-        "detailed": _detailed_text(node),
+        "section": _section(beam, layouts),
+        **detailed,
     }
 
 

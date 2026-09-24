@@ -103,8 +103,8 @@ def test_no_ui_text_outside_the_dictionary(page):
         "4",
         "ACI 318-19 · CIRSOC 201-25 · EN 1992",
     }
-    # API names (node.check_flexure(), pip install mento) are code, not copy: the design system
-    # puts them in the disclosure headers exactly as mento spells them.
+    # API names (pip install mento, node.check()) are code, not copy: the home's Python section
+    # shows them exactly as mento spells them. The calculators no longer do; they are for the end user.
     api = re.compile(r"(node|beam|slab|wall)(_1)?\.\w+(\(\))?|pip install mento")
     beams = re.compile(r"V\d{3}")  # element labels, as in an Excel of beams
     loose = {
@@ -132,7 +132,7 @@ def test_hero_shows_the_worked_example():
     assert hero["bottom"] == hero["opt1"] == bottom["bars"]
     assert hero["top"] == top["bars"]
     assert hero["stirrups"] == shear["stirrups"].replace(" cm", "").replace("/", " c/")
-    assert hero["section"] == f"{beam.EXAMPLE['width']} × {beam.EXAMPLE['height']}"
+    assert (hero["width"], hero["height"]) == (f"{beam.EXAMPLE['width']} cm", f"{beam.EXAMPLE['height']} cm")
     assert hero["bottom_dcr"] == hero["opt1_dcr"] == f"{bottom['DCR']:.2f}"
     assert hero["top_dcr"] == f"{top['DCR']:.2f}"
     assert hero["shear_dcr"] == f"{shear['DCR']:.2f}"
