@@ -473,6 +473,9 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
 .pycode-hd{display:flex;align-items:center;gap:12px;padding:12px var(--s-4) 6px}
 .pycode-hd .eyebrow{color:#8b95a1} .pycode-hd code{margin-left:auto;color:#c9e5a5;white-space:nowrap}
 .pycode .codeblock:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+/* a calculator's snippet says first what it needs, as the home's does: outside the <pre>, so Copiá leaves it out */
+.pyinst{margin:0;padding:0 var(--s-4) 6px;font-size:var(--fs-12);line-height:1.6;color:#8b95a1}
+.pyinst code{font-family:var(--font-mono);color:#c9e5a5;white-space:nowrap}
 .pyout{background:var(--surface);color:var(--ink);padding:6px 0 14px}
 .pyout .df th:not(:first-child),.pyout .df td:not(:first-child){width:36%}
 .pyout .mk{margin-left:6px;vertical-align:-1px}
