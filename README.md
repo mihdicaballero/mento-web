@@ -1,36 +1,11 @@
 # mento-web
 
 Free reinforced concrete calculators that run [mento](https://github.com/mihdicaballero/mento)
-**in the visitor's browser**, for engineers who would rather not open a notebook.
+in your browser: **[mentocalc.com](https://mentocalc.com)**
 
-There is no backend. Python runs client-side through [Pyodide](https://pyodide.org)
-(WebAssembly), so hosting is a static folder, the cost does not grow with traffic, and nothing
-the user types leaves their device.
-
-## Layout
-
-```
-index.html          Landing: one card per calculator, plus home.js
-beam/ slab/ wall/   One folder = one URL = one calculator (index.html + app.js)
-shared/             worker.js (Pyodide + mento), calculator.js, i18n.js, ui.js,
-                    style.css, i18n/<page>.json, logo
-py/                 common.py plus one glue module per calculator, and their tests
-```
-
-`shared/style.css` is the `<style id="site">` block of the design system, copied verbatim; the
-additions are at the end of the file, marked as such. The last of them, section 8, is design
-system v2: the stations as panels, softer controls with a single focus ring, a styled open list
-for `<select>` where the browser supports it, and dimension lines in the drawings. Light only.
-Section 8b is its movement (numbers that count, meters that grow, disclosures that fold): CSS and
-the browser's own animations, no library, and nothing that stays half-done if no frame runs.
-
-mento prints its detailed results as text and keeps the tables behind them private, so
-`common.reports()` reads the printout back into tables (a dashed rule marks each column) and the
-page lays them out as cards. The printout itself still travels, for the Copiá button. Every UI string lives in
-`shared/i18n/<page>.json` and reaches the markup through `data-i18n`; the Spanish in the HTML is
-the first paint and `py/test_site.py` keeps it equal to the dictionary.
-
-No build step, no framework, no `node_modules`.
+Beams, slabs and walls, checked against ACI 318-19, CIRSOC 201-25 and EN 1992. Nothing to
+install, and nothing you type leaves your device: Python runs in the browser through
+[Pyodide](https://pyodide.org). In Spanish and English.
 
 ## Run locally
 
@@ -38,52 +13,22 @@ No build step, no framework, no `node_modules`.
 python serve.py
 ```
 
-Open <http://localhost:8765>. It must be served over HTTP; `file://` cannot start the worker.
-`serve.py` is `python -m http.server` plus `Cache-Control: no-cache`: without it browsers cache
-by heuristic and keep an old `worker.js` or glue module after it changes, which breaks the import.
+Open <http://localhost:8765>.
 
 ## Test
-
-The glue in `py/` is plain Python with no Pyodide-specific code:
 
 ```bash
 pip install -r requirements-dev.txt
 pytest
 ```
 
-## Adding a calculator
+## Feedback and support
 
-1. `py/<name>.py` exposing `run(json) -> json`, `report(json) -> json` and an `EXAMPLE` dict
-   (the worker runs it once at boot to warm up), built on `py/common.py`. Add `py/test_<name>.py`.
-2. `<name>/index.html` with the four stations of the design system, and an `app.js` that calls
-   `start(spec)` from `shared/calculator.js` with what is its own: fields, rebar groups, the
-   drawing and the Python snippet.
-3. `shared/i18n/<name>.json` with both languages, and a card in `index.html`.
-
-## Which mento runs here
-
-The one **published on PyPI**, pinned as `MENTO_VERSION` in `shared/worker.js` and mirrored in
-`requirements-dev.txt` so CI tests the glue against the same version. A feature reaches this
-site only after a mento release. `pint<0.26` is pinned because mento 1.2.0 predates pint 0.26;
-drop it with the next bump.
-
-mento imports `IPython` only to render Markdown in notebooks, so the worker registers a stub
-instead of downloading it (~10 MB saved).
-
-The first visit installs mento with micropip and saves the result in the browser's Cache Storage:
-the PyPI packages plus the bytecode of every module imported, as one tar. Later visits unpack it
-and skip PyPI and the compiler, ~2 s less on a desktop. The cache key carries the Pyodide and
-mento versions and the package list, so a bump rebuilds it once and deletes the old one. The home
-page builds it in the background. To start from scratch, clear the site data in the browser.
-
-Python still takes a few seconds to start, so each calculator also keeps its last result in
-`localStorage` with the exact inputs it answers. A visit with the same inputs shows it at once
-and Python replaces it when ready; an edit before then greys it out as "recalculating".
-
-## Deploy
-
-Any static host. On Vercel: import the repo, framework preset **Other**, no build command,
-output directory `.`.
+- Found a result that differs from yours? [Open an issue](https://github.com/mihdicaballero/mento/issues/new).
+- Missing a calculator? [Ask for it](https://github.com/mihdicaballero/mento/discussions).
+- mento is free and ad-free. If it saved you an afternoon, you can support it on
+  [Ko-fi](https://ko-fi.com/mentoapp), [Cafecito](https://cafecito.app/mentoapp) or
+  [GitHub Sponsors](https://github.com/sponsors/mihdicaballero).
 
 ## Disclaimer
 

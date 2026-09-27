@@ -1,7 +1,7 @@
 # CLAUDE.md — mento-web
 
 Static site that runs the `mento` Python package in the browser via Pyodide. No backend, no
-build step, vanilla JS. Read `README.md` for layout and how to add a calculator.
+build step, vanilla JS. `README.md` is kept basic on purpose; the code is the reference.
 
 - Python for tests and the local server (Windows): `C:\Users\mihdi\anaconda3\envs\rame-env\python.exe`.
   Tests: `python -m pytest`. Lint: `python -m ruff check . && python -m ruff format --check .`
