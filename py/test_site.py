@@ -8,10 +8,10 @@ from pathlib import Path
 import mento
 import pandas as pd
 import pytest
+from common import signature
 from mento import BeamSummary, Concrete_ACI_318_19, MPa, SteelBar
 
 import beam
-from common import signature
 
 ROOT = Path(__file__).resolve().parent.parent
 PAGES = {
