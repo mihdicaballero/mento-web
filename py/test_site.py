@@ -8,6 +8,7 @@ from pathlib import Path
 import mento
 import pandas as pd
 import pytest
+from common import signature
 from mento import BeamSummary, Concrete_ACI_318_19, MPa, SteelBar
 
 import beam
@@ -138,9 +139,38 @@ def test_hero_shows_the_worked_example():
     assert hero["shear_dcr"] == f"{shear['DCR']:.2f}"
     governing = max(bottom["DCR"], top["DCR"], shear["DCR"])
     assert hero["dcr"] == f"{governing:.2f}"
-    assert 0.7 <= min(bottom["DCR"], top["DCR"], shear["DCR"]) and governing <= 0.9
-    es = _strings("home")["es"]
-    assert es["sumline"] == f"flexión {max(bottom['DCR'], top['DCR']):.2f} · corte {shear['DCR']:.2f}"
+    assert governing == bottom["DCR"] <= 0.9  # the bottom flexure governs: picking an option moves the verdict
+    assert hero["sum_flex"] == f"{max(bottom['DCR'], top['DCR']):.2f}" and hero["sum_shear"] == hero["shear_dcr"]
+
+
+def test_hero_options_are_what_mento_proposes():
+    """Each option the hero lets you pick, with what home.js redraws and links from it."""
+    result = json.loads(beam.run(json.dumps(beam.EXAMPLE)))
+    source = PAGES["home"].read_text(encoding="utf-8")
+    hero = dict(re.findall(r'data-hero="([a-z0-9_]+)">([^<]*)<', source))
+    viz = re.search(r'<div class="viz" id="hero" data-top="([^"]+)" data-st="([^"]+)">', source)
+    assert viz and (viz[1], viz[2]) == (signature(result["layouts"]["top"]), signature(result["layouts"]["st"]))
+    options = re.findall(
+        r'<label class="opt" data-sig="([^"]+)" data-mid="([^"]+)">.*?<span class="area">([^<]*)<', source
+    )
+    assert len(options) == len(result["options"]["bot"]) == 3
+    for index, ((sig, mid, area), option) in enumerate(zip(options, result["options"]["bot"]), start=1):
+        assert (sig, area) == (option["signature"], option["area"])
+        assert hero[f"opt{index}"] == option["bars"] and hero[f"opt{index}_dcr"] == f"{option['dcr']:.2f}"
+        picked = json.loads(beam.run(json.dumps({**beam.EXAMPLE, "choice": {"bot": sig}})))
+        # home.js moves only the bottom flexure: the top and the shear must not change with it
+        ledger = {row["key"]: f"{row['dcr']:.2f}" for row in picked["ledger"]}
+        assert ledger == {
+            "flexure_bottom": hero[f"opt{index}_dcr"],
+            "flexure_top": hero["top_dcr"],
+            "shear": hero["shear_dcr"],
+        }
+        # and it governs in every option, so the verdict moves with the pick
+        assert max(row["dcr"] for row in picked["ledger"]) == picked["ledger"][0]["dcr"]
+        low = [bar for bar in picked["section"]["bars"] if bar["y"] < beam.EXAMPLE["height"] / 2]
+        corners = {min(bar["x"] for bar in low), max(bar["x"] for bar in low)}
+        between = [f"{bar['x']:g},{bar['y']:g},{bar['d']:g}" for bar in low if bar["x"] not in corners]
+        assert mid.split(";") == between
 
 
 # The four beams of mento's user guide (BeamSummary), a units row first as the Excel carries it.

@@ -5,9 +5,9 @@ import { CONCRETE_CLASS, dimBelow, dimLeft, num, start } from "../shared/calcula
 const EXAMPLE = {
   code: "CIRSOC 201-25", fc: 25, fy: 420, width: 20, height: 60, cover: 25, label: "V-101", mode: "design",
   forces: [
-    { label: "1.4D", M_y: 55, V_z: 80, N_x: 0 },
-    { label: "1.2D+1.6L", M_y: 92, V_z: 95, N_x: 0 },
-    { label: "0.9D+1.0E", M_y: -45, V_z: 95, N_x: 30 },
+    { label: "1.4D", M_y: 55, V_z: 45, N_x: 0 },
+    { label: "1.2D+1.6L", M_y: 92, V_z: 70, N_x: 0 },
+    { label: "0.9D+1.0E", M_y: -45, V_z: 65, N_x: 30 },
   ],
   rebar: {
     bot: { n1: 2, d1: 16, n2: 1, d2: 12, n3: 0, d3: 0, n4: 0, d4: 0 },

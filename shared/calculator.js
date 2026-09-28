@@ -94,6 +94,46 @@ export async function drawingPng(svg) {
   return new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
 }
 
+// The Python snippet as a Jupyter notebook, to keep the calculation where the engineer keeps the
+// rest of their work: a note of where it came from, the install of the mento that answered it, and
+// the snippet in cells. A comment after code opens a new cell, so each result mento prints shows
+// under its own (a notebook displays only a cell's last expression).
+function notebook(code, intro, version) {
+  const blocks = [];
+  let block = [];
+  const flush = () => { if (block.length) blocks.push(block.join("\n")); block = []; };
+  for (const line of code.split("\n")) {
+    if (!line.trim()) { flush(); continue; }
+    if (line.startsWith("#") && block.length && !block.at(-1).startsWith("#")) flush();
+    block.push(line);
+  }
+  flush();
+  // nbformat keeps a cell's source as its lines, each but the last with its newline
+  const source = (text) => text.split("\n").map((line, index, lines) => (index < lines.length - 1 ? `${line}\n` : line));
+  const cell = (type, text, index) => ({
+    cell_type: type, id: `mento-${index}`, metadata: {}, source: source(text),
+    ...(type === "code" ? { execution_count: null, outputs: [] } : {}),
+  });
+  const cells = [["markdown", intro], ["code", `%pip install mento==${version}`], ...blocks.map((text) => ["code", text])];
+  return JSON.stringify({
+    cells: cells.map(([type, text], index) => cell(type, text, index)),
+    metadata: {
+      kernelspec: { display_name: "Python 3", language: "python", name: "python3" },
+      language_info: { name: "python" },
+    },
+    nbformat: 4,
+    nbformat_minor: 5,
+  }, null, 1);
+}
+
+function saveFile(blob, name) {
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+}
+
 export async function start(spec) {
   const groups = spec.groups.map((group) => group.key);
   const barIds = Object.keys(spec.bars);
@@ -696,13 +736,8 @@ export async function start(spec) {
     try {
       for (const file of await call("report", payload())) {
         const bytes = Uint8Array.from(atob(file.base64), (character) => character.charCodeAt(0));
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(new Blob([bytes], {
-          type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        }));
-        link.download = `mento-${t.file_name}-${state.label}-${new Date().toISOString().slice(0, 10)}.docx`;
-        link.click();
-        setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+        saveFile(new Blob([bytes], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }),
+          `mento-${t.file_name}-${state.label}-${new Date().toISOString().slice(0, 10)}.docx`);
       }
       toast(t.report_done);
     } catch (error) {
@@ -770,6 +805,14 @@ export async function start(spec) {
     event.preventDefault(); event.stopPropagation();
     copy($("python").textContent, t.code_copied);
   });
+  // The link in its first cell is the page's: it holds the last inputs that were valid, as Compartí does.
+  $("notebook-python").addEventListener("click", (event) => {
+    event.preventDefault(); event.stopPropagation();
+    const intro = `# ${t[spec.module]} ${state.label}\n\n${t.nb_intro.replace("{link}", location.href).replace("{code}", state.code)}`;
+    const json = notebook(spec.python(state, lastResult, t), intro, $("version").textContent);
+    saveFile(new Blob([json], { type: "application/x-ipynb+json" }), `mento-${t.file_name}-${state.label}.ipynb`);
+    toast(t.notebook_done);
+  });
   $("copy-detailed").addEventListener("click", (event) => {
     event.preventDefault(); event.stopPropagation();
     copy(lastResult?.detailed ?? "", t.text_copied);
@@ -786,11 +829,7 @@ export async function start(spec) {
       await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
       toast(t.image_copied);
     } catch {
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(await png);
-      link.download = `mento-${t.file_name}-${state.label}-${t.image_file}.png`;
-      link.click();
-      setTimeout(() => URL.revokeObjectURL(link.href), 10000);
+      saveFile(await png, `mento-${t.file_name}-${state.label}-${t.image_file}.png`);
       toast(t.image_saved);
     }
   });

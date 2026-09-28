@@ -287,14 +287,16 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .viz-prop .hd{padding:10px 12px 8px;border-bottom:var(--bw) solid var(--line-3);display:flex;align-items:center;gap:8px}
 .viz-prop .hd .eyebrow{color:var(--ink)} .viz-prop .hd .grp-name{margin-left:auto;font-size:var(--fs-11);color:var(--ink-2)}
 .viz-prop .opt{font-size:var(--fs-13);grid-template-columns:18px minmax(0,1fr) 58px 44px;padding:7px 10px}
-.viz-prop .more{padding:8px 12px;font-size:var(--fs-12);color:var(--brand-ink);border-top:var(--bw) solid var(--line-3)}
-.viz-verdict{position:absolute;left:24px;top:376px;width:512px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 14px;box-shadow:0 10px 30px rgba(26,29,33,.08)}
+.viz-prop .more{display:block;padding:8px 12px;font-size:var(--fs-12);color:var(--brand-ink);border-top:var(--bw) solid var(--line-3);text-decoration:none}
+.viz-prop .more:hover{text-decoration:underline}
+/* the hero is live: another option moves its meter as the calculator's does */
+.viz-verdict .mini .meter i{transition:width .4s var(--ease)}
+.viz-verdict{position:absolute;left:24px;top:376px;width:512px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2);display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding:10px 14px;box-shadow:0 10px 30px rgba(26,29,33,.08)}
 .viz-verdict .word{display:flex;align-items:center;gap:8px;font-size:var(--fs-16);font-weight:600;color:var(--ok-ink)}
 .viz-verdict .word .mark{width:26px;height:26px;border-radius:50%;background:var(--ok);color:#fff;display:inline-flex;align-items:center;justify-content:center}
 .viz-verdict .word .readout{font-size:var(--fs-22);color:var(--ok-ink)}
 .viz-verdict .mini{display:flex;flex-direction:column;gap:5px;font-size:var(--fs-11);color:var(--ink-2)}
 .viz-verdict .mini > div{display:flex;gap:8px;align-items:center} .viz-verdict .mini span:first-child{width:88px} .viz-verdict .mini .meter{flex-grow:1;height:6px} .viz-verdict .mini .num{color:var(--ink)}
-.viz-verdict .btn{font-size:var(--fs-12);padding:8px 12px}
 .viz-verdict .sum-line{display:none;font-size:var(--fs-12);color:var(--ok-ink);text-align:right}
 /* steps */
 .steps-band{padding:40px var(--s-6);border-top:var(--bw) solid var(--line-3);border-bottom:var(--bw) solid var(--line-3)}
@@ -311,7 +313,7 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .ccard--featured .name{font-size:var(--fs-20)} .ccard--featured .desc{font-size:13.5px} .ccard--featured .codes{font-size:var(--fs-12);color:var(--ink-2)}
 .ccard--featured .fig{flex-shrink:0}
 .soon-strip{grid-column:2 / span 2;display:flex;align-items:center;gap:18px;padding:14px 18px;border:var(--bw) dashed var(--line);border-radius:var(--r-2);font-size:var(--fs-13);color:var(--ink-2);flex-wrap:wrap}
-.soon-strip .eyebrow{color:var(--ink-3)} .soon-strip .item{display:flex;align-items:center;gap:8px} .soon-strip .item svg{width:28px;height:28px} .soon-strip a{margin-left:auto;text-decoration:none}
+.soon-strip .eyebrow{color:var(--ink-3)} .soon-strip .item{display:flex;align-items:center;gap:8px} .soon-strip .item svg{width:28px;height:28px}
 /* trust band */
 .band{background:var(--brand-soft);margin-top:44px;padding:40px var(--s-6)}
 .band-grid{display:grid;grid-template-columns:420px minmax(0,1fr);gap:56px;align-items:center}
@@ -372,7 +374,7 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
   .viz-draw{padding:8px 4px} .viz-draw .eyebrow{display:none} .viz-draw svg{width:110px;height:auto}
   .viz-prop .opt{grid-template-columns:14px minmax(0,1fr) 40px} .viz-prop .opt .area{display:none}
   .viz-verdict{grid-column:1 / span 2;grid-template-columns:auto minmax(0,1fr);background:var(--ok-soft);border-color:var(--ok-line)}
-  .viz-verdict .mini{display:none} .viz-verdict .btn{display:none} .viz-verdict .sum-line{display:block}
+  .viz-verdict .mini{display:none} .viz-verdict .sum-line{display:block}
   .steps-band{padding:28px var(--s-4) 0;border:0} .steps-row{grid-template-columns:1fr;gap:18px;margin-top:14px}
   .calcs{padding:28px var(--s-4) 0} .calcs .head{flex-direction:column;gap:2px} .cgrid--home{grid-template-columns:1fr;grid-template-rows:none;gap:10px}
   .ccard--featured{grid-row:auto;flex-direction:column;padding:18px} .ccard--featured .fig{display:none} .ccard--featured .name{font-size:var(--fs-16)}
@@ -423,8 +425,11 @@ a.btn--sec:hover,a.btn--sec:active{color:var(--brand-ink)}
 .disc-wrap{position:relative}
 .disc-wrap > .disc summary{padding-right:120px}
 .disc-wrap > .disc-copy{position:absolute;right:var(--s-4);top:8px}
-.disc-wrap > .disc-copy--dark{background:transparent;color:#fff;border-color:#4a5563}
-.disc-wrap > .disc-copy--dark:hover{background:#252a30}
+/* the code block's buttons, Notebook and Copiá, side by side where Copiá stands alone elsewhere */
+.disc-wrap > .disc-tools{position:absolute;right:var(--s-4);top:8px;display:flex;gap:var(--s-2)}
+.disc-wrap > .disc--code summary{padding-right:220px}
+.disc-wrap .disc-copy--dark{background:transparent;color:#fff;border-color:#4a5563}
+.disc-wrap .disc-copy--dark:hover{background:#252a30}
 /* AA contrast: --ink-3 is "never for information" (tokens), and these two carry some */
 .soon-strip .eyebrow,.steps li[data-s="todo"]{color:var(--ink-2)}
 /* number fields without the spinner: ↑/↓ already step the value (5.2), and the arrows took the
@@ -433,7 +438,7 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 /* touch targets ≥ 44 px on the phone for the links that stand alone (5.9) */
 @container calc (max-width:720px){
-  .link-btn,.brand,.top nav a,.person .links a,.soon-strip a,.band-grid > div > a{min-height:var(--ctl-h-touch);min-width:var(--ctl-h-touch);display:inline-flex;align-items:center}
+  .link-btn,.brand,.top nav a,.person .links a,.band-grid > div > a{min-height:var(--ctl-h-touch);min-width:var(--ctl-h-touch);display:inline-flex;align-items:center}
   .top nav a,.person .links a{justify-content:center}
   .seg--small button{min-width:var(--ctl-h-touch)}
   .support .donate .btn,.actions .btn{flex:none}  /* in a column, flex:1 would win over the 44 px height */
@@ -441,7 +446,7 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
   .top .title{min-width:0;overflow:hidden;text-overflow:ellipsis}
   /* the same in a disclosure's summary: the API name gives way, the Copiá button keeps its size */
   .disc summary .lbl{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .disc-wrap > .disc-copy{top:1px;flex:none}
+  .disc-wrap > .disc-copy,.disc-wrap > .disc-tools{top:1px} .disc-wrap > .disc-copy,.disc-tools .btn{flex:none}
   /* the control is 44 px, so the input inside it has to be too: tapping its padding must land on the field */
   .field .in input,.field .in.sel select,.cell input{height:100%}
 }
@@ -674,9 +679,9 @@ body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 a.btn--sec:hover,a.btn--sec:active{color:var(--ink)}
 .btn:disabled,.btn:disabled:hover,.btn[aria-disabled="true"]{background:var(--line-3);border-color:var(--line-3);color:var(--ink-3);box-shadow:none;transform:none}
 .btn:disabled svg{color:inherit}
-.disc--code .btn--sec,.disc-wrap > .disc-copy--dark{background:transparent;color:#fff;border-color:#3b4450;box-shadow:none}
-.disc--code .btn--sec svg,.disc-wrap > .disc-copy--dark svg{color:inherit}
-.disc-wrap > .disc-copy--dark:hover{background:#252a30;border-color:#4a5563}
+.disc--code .btn--sec,.disc-wrap .disc-copy--dark{background:transparent;color:#fff;border-color:#3b4450;box-shadow:none}
+.disc--code .btn--sec svg,.disc-wrap .disc-copy--dark svg{color:inherit}
+.disc-wrap .disc-copy--dark:hover{background:#252a30;border-color:#4a5563}
 
 /* drawing: engineering paper, and dimension lines (drawn by each calculator) */
 .drawing{border-color:var(--line-2);border-radius:var(--r-3);box-shadow:var(--sh-card);
