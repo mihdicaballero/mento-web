@@ -313,7 +313,7 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .ccard--featured .name{font-size:var(--fs-20)} .ccard--featured .desc{font-size:13.5px} .ccard--featured .codes{font-size:var(--fs-12);color:var(--ink-2)}
 .ccard--featured .fig{flex-shrink:0}
 .soon-strip{grid-column:2 / span 2;display:flex;align-items:center;gap:18px;padding:14px 18px;border:var(--bw) dashed var(--line);border-radius:var(--r-2);font-size:var(--fs-13);color:var(--ink-2);flex-wrap:wrap}
-.soon-strip .eyebrow{color:var(--ink-3)} .soon-strip .item{display:flex;align-items:center;gap:8px} .soon-strip .item svg{width:28px;height:28px} .soon-strip a{margin-left:auto;text-decoration:none}
+.soon-strip .eyebrow{color:var(--ink-3)} .soon-strip .item{display:flex;align-items:center;gap:8px} .soon-strip .item svg{width:28px;height:28px}
 /* trust band */
 .band{background:var(--brand-soft);margin-top:44px;padding:40px var(--s-6)}
 .band-grid{display:grid;grid-template-columns:420px minmax(0,1fr);gap:56px;align-items:center}
@@ -438,7 +438,7 @@ input[type="number"]{-moz-appearance:textfield;appearance:textfield}
 input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
 /* touch targets ≥ 44 px on the phone for the links that stand alone (5.9) */
 @container calc (max-width:720px){
-  .link-btn,.brand,.top nav a,.person .links a,.soon-strip a,.band-grid > div > a{min-height:var(--ctl-h-touch);min-width:var(--ctl-h-touch);display:inline-flex;align-items:center}
+  .link-btn,.brand,.top nav a,.person .links a,.band-grid > div > a{min-height:var(--ctl-h-touch);min-width:var(--ctl-h-touch);display:inline-flex;align-items:center}
   .top nav a,.person .links a{justify-content:center}
   .seg--small button{min-width:var(--ctl-h-touch)}
   .support .donate .btn,.actions .btn{flex:none}  /* in a column, flex:1 would win over the 44 px height */
