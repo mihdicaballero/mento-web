@@ -9,7 +9,7 @@ import pytest
 
 import wall
 
-CODES = ["ACI 318-19", "CIRSOC 201-25"]  # EN has no wall hooks in mento 1.2.0
+CODES = ["ACI 318-19", "CIRSOC 201-25"]  # EN has no wall hooks in mento 1.3.0
 
 
 def solve(**changes):
@@ -74,9 +74,9 @@ def test_check_mode_takes_the_mesh_the_user_typed():
 def test_a_mesh_below_the_minimum_ratio_fails_as_mento_marks_it():
     result = solve(mode="check", rebar={"horizontal": {"d": 6, "s": 45}, "vertical": {"d": 6, "s": 45}})
     assert result["ok"], result
-    ratios = [notice for notice in result["notices"] if notice["code"] == "rho_below_min"]
-    assert [notice["values"]["face"] for notice in ratios] == ["horizontal", "vertical"]
-    assert all(notice["severity"] == "bad" for notice in ratios)  # mento marks them ❌
+    ratios = [notice for notice in result["notices"] if notice["code"] == "mesh_ratio_below_min"]
+    assert [notice["values"]["direction"] for notice in ratios] == ["h", "v"]
+    assert all(notice["severity"] == "bad" for notice in ratios)
 
 
 def test_the_worked_example_has_no_errors():

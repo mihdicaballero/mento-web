@@ -6,11 +6,11 @@
 // plus unsolicited {type: "progress", step} and {type: "ready", version} on startup.
 
 const PYODIDE_VERSION = "0.29.5";
-const MENTO_VERSION = "1.2.0";
+const MENTO_VERSION = "1.3.0";
 const PYODIDE_URL = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
 const PYODIDE_PACKAGES = ["numpy", "pandas", "jinja2", "lxml"];
-// mento 1.2.0 predates pint 0.26; the cap goes away with the next mento release.
-const PYPI_PACKAGES = ["pint<0.26", "tabulate", "python-docx"];
+// mento's own dependencies that Pyodide does not ship (it is installed with deps=False).
+const PYPI_PACKAGES = ["pint", "tabulate", "python-docx"];
 
 const MODULE = new URL(self.location.href).searchParams.get("module");
 if (!/^[a-z_]+$/.test(MODULE || "")) throw new Error(`Unknown calculator module: ${MODULE}`);

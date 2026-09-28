@@ -39,8 +39,6 @@
   "no_demand": "sin demanda · armadura mínima",
   "nowarn": "Sin avisos",
   "notice": "Aviso.",
-  "as_below_min": "Armadura {face} por debajo de la mínima: <span class=\"mono\">{A_s} &lt; {limit}</span>. Subila a la mínima para cumplir el límite de la norma.",
-  "as_above_max": "Armadura {face} por encima de la máxima: <span class=\"mono\">{A_s} &gt; {limit}</span>. Bajala o agrandá la sección.",
   "cannot": "No se pudo calcular.",
   "fatal": "No se pudo cargar el motor de cálculo. Revisá tu conexión y recargá la página.",
   "recalculating": "Recalculando…",
@@ -83,8 +81,6 @@
   "flexure_top": "Flexión superior",
   "bot": "Inferior",
   "top": "Superior",
-  "bot_l": "inferior",
-  "top_l": "superior",
   "err_height": "h tiene que ser mayor que 2·cc.",
   "page_title": "mento · Losa en una dirección de hormigón armado",
   "page_desc": "Diseñá la armadura de una franja de losa en una dirección o verificá la tuya: flexión y corte por combinación según ACI 318-19, CIRSOC 201-25 y EN 1992, en tu navegador.",
@@ -105,13 +101,7 @@
   "image_file": "seccion",
   "dcr_max": "DCR máx.",
   "notice_bad": "No verifica.",
-  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
-  "min_short": "mín.",
-  "max_short": "máx.",
-  "as_short": "Armadura {face} insuficiente: <span class=\"mono\">{A_s} &lt; {limit}</span> que pide la {why} en {combo}.",
-  "why_tension": "tracción",
-  "why_compression": "compresión (doble armadura)",
-  "spacing": "Las barras {face} quedan muy juntas: separación libre <span class=\"mono\">{value} mm &lt; {min} mm</span>. Separalas más o usá un diámetro menor."
+  "bars_n": "{n} barras"
  },
  "en": {
   "calc": "Calculators",
@@ -153,8 +143,6 @@
   "no_demand": "no demand · minimum reinforcement",
   "nowarn": "No warnings",
   "notice": "Warning.",
-  "as_below_min": "{face} reinforcement below the minimum: <span class=\"mono\">{A_s} &lt; {limit}</span>. Raise it to the minimum to meet the code limit.",
-  "as_above_max": "{face} reinforcement above the maximum: <span class=\"mono\">{A_s} &gt; {limit}</span>. Lower it or enlarge the section.",
   "cannot": "Could not calculate.",
   "fatal": "The calculation engine could not be loaded. Check your connection and reload the page.",
   "recalculating": "Recalculating…",
@@ -197,8 +185,6 @@
   "flexure_top": "Top flexure",
   "bot": "Bottom",
   "top": "Top",
-  "bot_l": "bottom",
-  "top_l": "top",
   "err_height": "h must be greater than 2·cc.",
   "page_title": "mento · One-way reinforced concrete slab",
   "page_desc": "Design the reinforcement of a one-way slab strip or check yours: flexure and shear per combination to ACI 318-19, CIRSOC 201-25 and EN 1992, in your browser.",
@@ -219,12 +205,6 @@
   "image_file": "section",
   "dcr_max": "Max DCR",
   "notice_bad": "Fails.",
-  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
-  "min_short": "min.",
-  "max_short": "max.",
-  "as_short": "{face} reinforcement short: <span class=\"mono\">{A_s} &lt; {limit}</span> required by {why} in {combo}.",
-  "why_tension": "tension",
-  "why_compression": "compression (doubly reinforced)",
-  "spacing": "The {face} bars are too close: clear spacing <span class=\"mono\">{value} mm &lt; {min} mm</span>. Space them wider or use a smaller bar."
+  "bars_n": "{n} bars"
  }
 }

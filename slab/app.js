@@ -33,8 +33,11 @@ function drawing(result, t, phone) {
     parts.push(`<circle class="dw-bar" cx="${(x0 + bar.x * scale).toFixed(2)}"`
       + ` cy="${(y0 + (height - bar.y) * scale).toFixed(2)}" r="${Math.max(1.8, (bar.d / 2) * scale).toFixed(2)}"/>`);
   }
-  if (result.rebar.top) parts.push(`<text class="dw-label" x="${x0}" y="${y0 - 10}">${result.rebar.top}</text>`);
-  if (result.rebar.bot) parts.push(`<text class="dw-label" x="${x0}" y="${y0 + h + 22}">${result.rebar.bot}</text>`);
+  // Ø10 c/15 cm is 6.67 bars a metre, and 5.24 cm²/m, but 7 bars are placed: mento counts both
+  const label = (group) => [result.rebar[group], result.placed && t.bars_n.replace("{n}", result.placed[group]), result.area?.[group]]
+    .filter(Boolean).join(" · ");
+  if (result.rebar.top) parts.push(`<text class="dw-label" x="${x0}" y="${y0 - 10}">${label("top")}</text>`);
+  if (result.rebar.bot) parts.push(`<text class="dw-label" x="${x0}" y="${y0 + h + 22}">${label("bot")}</text>`);
   // dimension lines: the thickness on the left, the width under the bottom label (its extension
   // lines start below the label, so they never cross it)
   parts.push(dimLeft(y0, y0 + h, x0, x0 - 14, `${height} cm`), dimBelow(x0, x0 + w, y0 + h + 26, y0 + h + 38, `${width} cm`));
@@ -74,6 +77,10 @@ function python(state, result) {
     "",
     "# Perform all checks",
     "node.check()",
+    "# Does it comply? The DCR is not all: mento lists the code limits the section misses",
+    "print(slab.flexure_design.complies)",
+    "for warning in node.warnings:",
+    "    print(warning.code, warning.message)",
     "# Print results in Markdown format",
     "node.results",
     "# Print shear results in more detailed format in a DataFrame",

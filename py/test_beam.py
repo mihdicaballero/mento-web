@@ -11,6 +11,7 @@ import pytest
 import beam
 
 CODES = ["ACI 318-19", "CIRSOC 201-25", "EN 1992-2004"]
+FIT = ("clear_spacing_below_min", "bars_do_not_fit")
 
 
 def solve(**changes):
@@ -52,13 +53,20 @@ def test_section_moves_bars_that_do_not_fit_to_a_second_row():
 
 
 def test_a_designed_second_row_stays_in_the_second_row():
-    # mento puts 2Ø10 in each row here (n_1 and n_3); listed without the empty n_2 they would
-    # read as 4Ø10 in the first row, which does not fit a 12 cm web
+    # mento puts 2Ø16 and 2Ø12 in two rows here (n_1 and n_3); its options list only the groups
+    # that carry bars, and read as n_1 + n_2 they would be four bars in one row of a 12 cm web
     result = solve(width=12, height=30, forces=[{"label": "U", "M_y": 40, "V_z": 50}])
-    assert result["layouts"]["bot"] == {"n1": 2, "d1": 10.0, "n3": 2, "d3": 10.0}
-    assert result["rows"]["bot"] == ["2Ø10", "2Ø10"]
-    assert [label["bars"] for label in result["section"]["labels"]["bot"]] == ["2Ø10", "2Ø10"]
-    assert not any(notice["code"] == "spacing" for notice in result["notices"])
+    assert result["layouts"]["bot"] == {"n1": 2, "d1": 16.0, "n3": 2, "d3": 12.0}
+    assert result["rows"]["bot"] == ["2Ø16", "2Ø12"]
+    assert [label["bars"] for label in result["section"]["labels"]["bot"]] == ["2Ø16", "2Ø12"]
+    assert not any(notice["code"] in FIT for notice in result["notices"])
+
+
+def test_groups_that_fit_one_row_stay_in_it():
+    result = solve()
+    assert result["layouts"]["bot"] == {"n1": 2, "d1": 16.0, "n2": 1, "d2": 12.0}
+    for option in result["options"]["bot"]:
+        assert len(option["rows"]) == 1, option  # a 20 cm web takes each of them in one row
 
 
 def test_check_mode_takes_a_second_row_on_each_face():
@@ -81,8 +89,9 @@ def test_bars_that_do_not_fit_one_row_fail_as_mento_says():
         "stirrups": {"n": 1, "d": 8, "s": 15},
     }
     result = solve(mode="check", rebar=rebar, width=20, height=40, forces=[{"label": "U", "M_y": 60, "V_z": 50}])
-    spacing = [notice for notice in result["notices"] if notice["code"] == "spacing"]
+    spacing = [notice for notice in result["notices"] if notice["code"] in FIT]
     assert spacing and spacing[0]["severity"] == "bad" and spacing[0]["values"]["face"] == "bottom"
+    assert spacing[0]["message"]  # mento's own sentence, in the page's language
 
 
 DOUBLY = {
@@ -92,12 +101,12 @@ DOUBLY = {
 }
 
 
-def test_a_doubly_reinforced_design_is_not_flagged_above_the_maximum():
+def test_a_doubly_reinforced_design_complies_past_the_singly_reinforced_maximum():
     result = solve(**DOUBLY)
     bottom = result["flexure"]["bottom"]
     assert float(bottom["A_s"].split()[0]) > float(bottom["A_s_max"].split()[0])  # past the singly reinforced limit
-    assert not any(notice["code"] == "as_above_max" for notice in result["notices"])  # mento: ✅ D.R.
-    assert not any(notice["code"] == "as_short" for notice in result["notices"])  # its top covers the compression
+    assert result["complies"] and bottom["complies"]  # its top steel keeps it tension-controlled
+    assert result["notices"] == []
 
 
 def test_top_steel_short_of_the_compression_a_doubly_reinforced_beam_needs_fails():
@@ -107,13 +116,32 @@ def test_top_steel_short_of_the_compression_a_doubly_reinforced_beam_needs_fails
         "stirrups": {"n": 1, "d": 8, "s": 15},
     }
     result = solve(mode="check", rebar=rebar, **DOUBLY)
-    (top,) = [
-        notice for notice in result["notices"] if notice["code"] == "as_short" and notice["values"]["face"] == "top"
-    ]
-    assert top["severity"] == "bad"
-    # U2's negative moment asks less of the top than U1's positive one does as compression steel
-    assert top["values"]["why"] == "compression" and top["values"]["combo"] == "U1"
-    assert float(top["values"]["limit"].split()[0]) > 1.99
+    (short,) = [notice for notice in result["notices"] if notice["code"] == "not_tension_controlled"]
+    assert short["severity"] == "bad"
+    assert short["values"] == {"face": "bottom", "combos": ["U1"]}
+    assert not result["complies"] and not result["flexure"]["bottom"]["complies"]
+
+
+ACI_OVER_MAX = {
+    "code": "ACI 318-19",
+    "mode": "check",
+    "width": 25,
+    "height": 40,
+    "forces": [{"label": "U", "M_y": 100, "V_z": 50}],
+    "rebar": {"bot": {"n1": 3, "d1": 25, "n3": 3, "d3": 25}, "top": {}, "stirrups": {"n": 1, "d": 8, "s": 15}},
+}
+
+
+def test_a_section_that_is_not_tension_controlled_fails_with_a_dcr_below_one():
+    """ACI 318-19 §9.3.3.1: 6Ø25 in a 25x40 beam carries 100 kNm (DCR 0.64) but does not comply."""
+    result = solve(**ACI_OVER_MAX)
+    bottom = next(row for row in result["ledger"] if row["key"] == "flexure_bottom")
+    assert bottom["dcr"] == 0.64 and bottom["complies"] is False
+    assert result["flexure"]["bottom"]["DCR"] < 1 and not result["flexure"]["bottom"]["complies"]
+    assert result["complies"] is False
+    (notice,) = result["notices"]
+    assert notice["code"] == "not_tension_controlled" and notice["severity"] == "bad"
+    assert "9.3.3.1" in notice["message"]
 
 
 def test_the_worked_example_has_no_errors():
@@ -187,24 +215,39 @@ def test_ledger_is_three_rows_capacity_demand_and_governing_combination():
     assert [row["key"] for row in ledger] == ["flexure_bottom", "flexure_top", "shear"]
     bottom, top, shear = ledger
     assert bottom["combo"] == "1.2D+1.6L" and bottom["symbol"] == "ØMn"
-    assert bottom["capacity"] > bottom["demand"] == 90.0 and bottom["unit"] == "kNm"
+    assert bottom["capacity"] > bottom["demand"] == 92.0 and bottom["unit"] == "kNm"
     assert top["combo"] == "0.9D+1.0E"  # the only combination that puts the top in tension
-    assert shear["symbol"] == "ØVn" and shear["demand"] == 120.0 and shear["unit"] == "kN"
+    assert shear["symbol"] == "ØVn" and shear["demand"] == 95.0 and shear["unit"] == "kN"
+    assert bottom["complies"] and top["complies"]
     assert max(row["dcr"] for row in ledger) == max(
         solve()["flexure"]["bottom"]["DCR"], solve()["shear"]["DCR"], solve()["flexure"]["top"]["DCR"]
     )
 
 
 def test_a_face_without_demand_has_no_dcr():
-    ledger = solve(forces=[{"label": "U", "M_y": 90, "V_z": 120}])["ledger"]
+    ledger = solve(forces=[{"label": "U", "M_y": 92, "V_z": 95}])["ledger"]
     top = next(row for row in ledger if row["key"] == "flexure_top")
     assert top["dcr"] is None and top["combo"] is None and top["capacity"]
 
 
-def test_steel_below_the_minimum_is_a_notice_not_a_failure():
+def test_the_minimum_is_the_effective_one():
+    """The example's top face, 2Ø12 + 1Ø10 under Mu = -45 kNm, is below A_s,min but above the
+    A_s,min,eff the 4/3 of CIRSOC 201-25 §9.6.1.3 leaves: no warning, and it complies."""
     result = solve()
-    assert any(notice["code"] == "as_below_min" for notice in result["notices"]), result["notices"]
-    assert all(row["dcr"] is None or row["dcr"] <= 1 for row in result["ledger"])
+    top = result["flexure"]["top"]
+    assert top["bars"] == "2Ø12 + 1Ø10"
+    area = float(top["A_s"].split()[0])
+    assert float(top["A_s_min_eff"].split()[0]) <= area < float(top["A_s_min"].split()[0])
+    assert top["complies"] and result["notices"] == []
+
+
+def test_steel_below_the_effective_minimum_fails():
+    rebar = {"bot": {"n1": 2, "d1": 8}, "top": {}, "stirrups": {"n": 1, "d": 6, "s": 20}}
+    # 2Ø8 carries 18 kNm, but is short of 4/3 of what that moment asks for and of the minimum
+    result = solve(mode="check", rebar=rebar, forces=[{"label": "U", "M_y": 18, "V_z": 20}])
+    assert result["flexure"]["bottom"]["DCR"] < 1
+    (notice,) = [notice for notice in result["notices"] if notice["code"] == "As_below_min"]
+    assert notice["severity"] == "bad" and notice["values"]["face"] == "bottom"
 
 
 def test_tables_keep_mentos_columns_with_the_units_in_the_header():
@@ -228,7 +271,7 @@ def test_detailed_results_come_as_tables_too():
     check = flexure["tables"][3]
     assert check["columns"] == ["Unit", "Value", "Min.", "Max.", "Ok?"]
     assert all(len(row) == 6 for row in check["rows"])
-    assert shear["tables"][-1]["rows"][-1][1:3] == ["DCR", "0.81"]
+    assert shear["tables"][-1]["rows"][-1][1:3] == ["DCR", "0.89"]
     assert "BEAM FLEXURE DETAILED RESULTS" in result["detailed"]  # the text stays, for Copiá
 
 

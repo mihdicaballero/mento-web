@@ -1,8 +1,10 @@
 name: Test count
 
-# The home shows how many tests mento runs against published examples. mento's release
-# workflow attaches that number to the release as stats.json and pings this repository;
-# this job copies it to shared/stats.json and commits it, so the static site can read it.
+# The home shows how many of mento's tests reproduce a published, external example. mento's
+# release workflow pings this repository with that number (client_payload.tests) and the version
+# (client_payload.version), and attaches the same number to the release as stats.json; this job
+# copies it to shared/stats.json and commits it, so the static site can read it. Run by hand, or
+# with a ping that carries no number, it reads stats.json from the latest release.
 on:
   repository_dispatch:
     types: [mento-release]
@@ -16,24 +18,36 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fetch stats.json from the latest mento release
+      - name: Write shared/stats.json
+        env:
+          PAYLOAD_TESTS: ${{ github.event.client_payload.tests }}
         run: |
-          curl -fsSL https://github.com/mihdicaballero/mento/releases/latest/download/stats.json -o /tmp/stats.json
+          if [ -z "$PAYLOAD_TESTS" ]; then
+            curl -fsSL https://github.com/mihdicaballero/mento/releases/latest/download/stats.json -o /tmp/stats.json
+          else
+            printf '{"tests": %s}' "$PAYLOAD_TESTS" > /tmp/stats.json
+          fi
           python3 - <<'EOF'
           import json
           stats = json.load(open("/tmp/stats.json"))
           tests = stats.get("tests")
-          if not isinstance(tests, int) or tests <= 0:
-              raise SystemExit(f"stats.json has no positive integer 'tests': {stats!r}")
+          if not isinstance(tests, int) or isinstance(tests, bool) or tests <= 0:
+              raise SystemExit(f"no positive integer 'tests': {stats!r}")
           with open("shared/stats.json", "w") as out:
               json.dump({"tests": tests}, out)
               out.write("\n")
           EOF
       - name: Commit if it changed
+        env:
+          PAYLOAD_VERSION: ${{ github.event.client_payload.version }}
         run: |
           git add shared/stats.json
           git diff --cached --quiet && exit 0
+          version="$PAYLOAD_VERSION"
+          if [ -z "$version" ]; then
+            version=$(curl -fsSL https://pypi.org/pypi/mento/json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: test count from mento $(curl -fsSL https://pypi.org/pypi/mento/json | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])')"
+          git commit -m "chore: test count from mento $version"
           git push

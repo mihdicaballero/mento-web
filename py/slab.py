@@ -8,7 +8,6 @@ A strip of the width the user defines, reinforced with a diameter at a spacing o
 from __future__ import annotations
 
 import json
-import math
 import warnings
 from typing import Any
 
@@ -92,71 +91,47 @@ def _face(slab: OneWaySlab, group: str) -> Any:
     return slab.flexure_design.bottom if group == "bot" else slab.flexure_design.top
 
 
-def _options(data: dict[str, Any], slab: OneWaySlab, layouts: dict[str, Any], limit: int = 3) -> dict[str, Any]:
-    # The spacing limit of a slab: three times its thickness, and never more than 40 cm.
-    max_spacing = min(3 * common.number(data, "height"), 40.0)
+def _state(slab: OneWaySlab, group: str) -> tuple[float, bool]:
+    face = _face(slab, group)
+    return round(float(face.DCR), 3), bool(face.complies)
+
+
+def _per_metre(area: Any, width: float) -> str:
+    """A strip's steel per metre of slab: mento's area counts width / s bars, 6.67 for Ø10/15."""
+    return f"{float(area.to('cm**2').magnitude) * 100 / width:.2f} cm²/m"
+
+
+def _options(data: dict[str, Any], slab: OneWaySlab) -> dict[str, Any]:
+    """The meshes mento's design offers for each face, the applied one first. The alternatives are
+    the ones the finished strip passes with, so there may be fewer than asked for."""
+    width = common.number(data, "width")
     options: dict[str, Any] = {}
     for group in GROUPS:
         face = _face(slab, group)
-        required = float(face.A_s_req.to("cm**2").magnitude) if face.A_s_req is not None else 0.0
-        strip = common.number(data, "width")
-        candidates = common.spacing_options(required / strip * 100, layouts[group], limit, max_spacing)
-        options[group] = [
-            {
-                "bars": common.mesh_bars(layout),
-                "area": common.mesh_area(layout),
-                "signature": common.signature(layout),
-                "layout": layout,
-            }
-            for layout in candidates
-            if layout
-        ]
+        options[group] = []
+        for option in face.options or [face]:
+            layout = _layer_layout(option.layers)
+            if not layout or any(known["layout"] == layout for known in options[group]):
+                continue
+            options[group].append(
+                {
+                    "bars": common.mesh_bars(layout),
+                    "area": _per_metre(option.A_s, width),
+                    "placed": option.n_bars_placed,
+                    "signature": common.signature(layout),
+                    "layout": layout,
+                }
+            )
     return options
 
 
-def _ledger(slab: OneWaySlab, forces: list[Any], code: str) -> list[dict[str, Any]]:
-    """Bottom flexure, top flexure and shear: the three resistances mento reports with a DCR."""
-    symbols = common.CAPACITY.get(code, common.DEFAULT_CAPACITY)
-    demands = {force.label: force for force in forces}
-    rows = []
-    for key, name in (("flexure_bottom", "bottom"), ("flexure_top", "top")):
-        governing = max(slab.flexure_check_results(forces), key=lambda check, name=name: getattr(check, name).DCR)
-        check = getattr(governing, name)
-        moment = float(demands[governing.label].M_y.to("kN*m").magnitude)
-        loaded = moment > 0 if name == "bottom" else moment < 0
-        rows.append(
-            {
-                "key": key,
-                "dcr": round(float(check.DCR), 3) if loaded else None,
-                "symbol": symbols["M"],
-                "demand_symbol": "Mu",
-                "capacity": common.magnitude(check.M_capacity, "kN*m"),
-                "demand": round(abs(moment), 1) if loaded else None,
-                "unit": "kNm",
-                "combo": governing.label if loaded else None,
-            }
-        )
-    shear = max(slab.shear_check_results(forces), key=lambda check: check.DCR)
-    rows.append(
-        {
-            "key": "shear",
-            "dcr": round(float(shear.DCR), 3),
-            "symbol": symbols["V"],
-            "demand_symbol": "Vu",
-            "capacity": common.magnitude(shear.V_capacity, "kN"),
-            "demand": round(abs(float(demands[shear.label].V_z.to("kN").magnitude)), 1),
-            "unit": "kN",
-            "combo": shear.label,
-        }
-    )
-    return rows
-
-
 def _section(slab: OneWaySlab, layouts: dict[str, Any]) -> dict[str, Any]:
-    """The strip in cm, with the bars of each face placed along it, for the page to draw."""
+    """The strip in cm, with the bars of each face placed along it, for the page to draw: as many
+    as mento places (``n_placed``, the whole bars that lay the spacing out across the strip)."""
     width = float(slab.width.to("cm").magnitude)
     height = float(slab.height.to("cm").magnitude)
     cover = float(slab.c_c.to("cm").magnitude)
+    reinforcement = slab.reinforcement
     bars: list[dict[str, float]] = []
     for group, bottom in (("bot", True), ("top", False)):
         layout = layouts.get(group) or {}
@@ -164,7 +139,7 @@ def _section(slab: OneWaySlab, layouts: dict[str, Any]) -> dict[str, Any]:
             continue
         diameter = layout["d"] / 10
         spacing = layout["s"]
-        count = max(1, math.ceil(width / spacing))
+        count = (reinforcement.bottom if bottom else reinforcement.top).n_bars_placed
         start = (width - (count - 1) * spacing) / 2
         y = cover + diameter / 2 if bottom else height - cover - diameter / 2
         for index in range(count):
@@ -188,11 +163,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
     else:
         designed = _build(data)
         Node(section=designed, forces=forces).design()
-        proposal = {
-            group: _layer_layout(getattr(designed.reinforcement, "bottom" if group == "bot" else "top").layers)
-            for group in GROUPS
-        }
-        options = _options(data, designed, proposal)
+        options = _options(data, designed)
         selected, changed = common.select(options, data.get("choice") or {})
         layouts = {group: common.selected_layout(options, group, selected) for group in options}
 
@@ -204,25 +175,29 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
 
     if not check_mode:
 
-        def evaluate(candidate: dict[str, Any], group: str) -> float:
-            other, _ = _checked(data, forces, candidate)
-            return round(float(_face(other, group).DCR), 3)
+        def evaluate(candidate: dict[str, Any], group: str) -> tuple[float, bool]:
+            return _state(_checked(data, forces, candidate)[0], group)
 
-        current = {group: round(float(_face(slab, group).DCR), 3) for group in options}
+        current = {group: _state(slab, group) for group in options}
         common.fill_option_dcrs(options, selected, current, evaluate)
 
     detailed = common.detailed(node.flexure_results_detailed, node.shear_results_detailed)
+    placed, width = slab.reinforcement, common.number(data, "width")
     return {
         "ok": True,
         "version": mento.__version__,
         "code": data["code"],
         "rebar": {group: common.mesh_bars(layout) for group, layout in layouts.items()},
+        # a metre of Ø10/15 is 6.67 bars and 5.24 cm²; 7 of them are placed
+        "placed": {group: face.n_bars_placed for group, face in (("bot", placed.bottom), ("top", placed.top))},
+        "area": {group: _per_metre(face.A_s, width) for group, face in (("bot", placed.bottom), ("top", placed.top))},
         "layouts": layouts,
         "options": options,
         "selected": selected,
         "changed": changed,
-        "ledger": _ledger(slab, forces, data["code"]),
-        "notices": common.flexure_notices(slab, forces, detailed["reports"], list(captured)),
+        "complies": bool(slab.flexure_design.complies) and slab.shear_design.DCR <= 1,
+        "ledger": [*common.flexure_rows(slab, forces, data["code"]), common.shear_row(slab, forces, data["code"])],
+        "notices": common.warning_notices(node, list(captured)),
         "tables": {"flexure": common.table(flexure_table), "shear": common.table(shear_table)},
         "section": _section(slab, layouts),
         **detailed,
@@ -252,11 +227,7 @@ def report(payload: str) -> str:
     else:
         designed = _build(data)
         Node(section=designed, forces=forces).design()
-        proposal = {
-            group: _layer_layout(getattr(designed.reinforcement, "bottom" if group == "bot" else "top").layers)
-            for group in GROUPS
-        }
-        options = _options(data, designed, proposal)
+        options = _options(data, designed)
         selected, _ = common.select(options, data.get("choice") or {})
         layouts = {group: common.selected_layout(options, group, selected) for group in options}
     slab, node = _checked(data, forces, layouts)

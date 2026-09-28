@@ -6,7 +6,7 @@ const EXAMPLE = {
   code: "CIRSOC 201-25", fc: 25, fy: 420, width: 20, height: 60, cover: 25, label: "V-101", mode: "design",
   forces: [
     { label: "1.4D", M_y: 55, V_z: 80, N_x: 0 },
-    { label: "1.2D+1.6L", M_y: 90, V_z: 120, N_x: 0 },
+    { label: "1.2D+1.6L", M_y: 92, V_z: 95, N_x: 0 },
     { label: "0.9D+1.0E", M_y: -45, V_z: 95, N_x: 30 },
   ],
   rebar: {
@@ -107,6 +107,10 @@ function python(state, result) {
     "",
     "# Perform all checks",
     "node.check()",
+    "# Does it comply? The DCR is not all: mento lists the code limits the section misses",
+    "print(beam.flexure_design.complies)",
+    "for warning in node.warnings:",
+    "    print(warning.code, warning.message)",
     "# Print results in Markdown format",
     "node.results",
     "# Print shear results in more detailed format in a DataFrame",

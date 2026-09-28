@@ -39,8 +39,6 @@
   "no_demand": "sin demanda · armadura mínima",
   "nowarn": "Sin avisos",
   "notice": "Aviso.",
-  "as_below_min": "Armadura {face} por debajo de la mínima: <span class=\"mono\">{A_s} &lt; {limit}</span>. Subila a la mínima para cumplir el límite de la norma.",
-  "as_above_max": "Armadura {face} por encima de la máxima: <span class=\"mono\">{A_s} &gt; {limit}</span>. Bajala o agrandá la sección.",
   "cannot": "No se pudo calcular.",
   "fatal": "No se pudo cargar el motor de cálculo. Revisá tu conexión y recargá la página.",
   "recalculating": "Recalculando…",
@@ -87,10 +85,7 @@
   "file_name": "tabique",
   "horizontal": "Malla horizontal",
   "vertical": "Malla vertical",
-  "horizontal_l": "horizontal",
-  "vertical_l": "vertical",
   "shear_in_plane": "Corte en el plano",
-  "rho_below_min": "Cuantía {face} por debajo de la mínima: <span class=\"mono\">{A_s} &lt; {limit}</span>. Achicá la separación o subí el diámetro.",
   "err_cover": "El espesor tiene que ser mayor que 2·cc.",
   "aria_thickness": "Espesor tw, en cm",
   "aria_length": "Longitud lw, en cm",
@@ -104,10 +99,7 @@
   "image_saved": "Imagen descargada",
   "image_file": "seccion",
   "dcr_max": "DCR máx.",
-  "notice_bad": "No verifica.",
-  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
-  "min_short": "mín.",
-  "max_short": "máx."
+  "notice_bad": "No verifica."
  },
  "en": {
   "calc": "Calculators",
@@ -149,8 +141,6 @@
   "no_demand": "no demand · minimum reinforcement",
   "nowarn": "No warnings",
   "notice": "Warning.",
-  "as_below_min": "{face} reinforcement below the minimum: <span class=\"mono\">{A_s} &lt; {limit}</span>. Raise it to the minimum to meet the code limit.",
-  "as_above_max": "{face} reinforcement above the maximum: <span class=\"mono\">{A_s} &gt; {limit}</span>. Lower it or enlarge the section.",
   "cannot": "Could not calculate.",
   "fatal": "The calculation engine could not be loaded. Check your connection and reload the page.",
   "recalculating": "Recalculating…",
@@ -197,10 +187,7 @@
   "file_name": "wall",
   "horizontal": "Horizontal mesh",
   "vertical": "Vertical mesh",
-  "horizontal_l": "horizontal",
-  "vertical_l": "vertical",
   "shear_in_plane": "In-plane shear",
-  "rho_below_min": "{face} ratio below the minimum: <span class=\"mono\">{A_s} &lt; {limit}</span>. Tighten the spacing or use a larger bar.",
   "err_cover": "The thickness must be greater than 2·cc.",
   "aria_thickness": "Thickness tw, in cm",
   "aria_length": "Length lw, in cm",
@@ -214,9 +201,6 @@
   "image_saved": "Image downloaded",
   "image_file": "section",
   "dcr_max": "Max DCR",
-  "notice_bad": "Fails.",
-  "mento_check": "{label}: <span class=\"mono\">{value} {unit}{limit}</span>.",
-  "min_short": "min.",
-  "max_short": "max."
+  "notice_bad": "Fails."
  }
 }
