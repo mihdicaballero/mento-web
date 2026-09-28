@@ -24,7 +24,7 @@ if (moving) {
 // ------------------------------------------------------------ the hero, live
 // Picking another of mento's options redraws its bars and moves the bottom flexure DCR, as the
 // calculator does; each option's numbers are mento's (the markup carries them, the tests check
-// them). Its two links open the beam calculator on that same design, or on it loaded to check.
+// them). Its link opens the beam calculator with that option loaded, to check it or change it.
 const hero = document.getElementById("hero");
 const heroCell = (name) => hero.querySelector(`[data-hero="${name}"]`);
 const fixed2 = (value) => value.toFixed(2);
@@ -34,17 +34,13 @@ const groups = (signature) => signature.split("+").map((group) => group.split("x
 
 // The calculator's link (shared/calculator.js readHash): what it leaves out stays the example's.
 // In check mode its bar fields go in their order: bottom and top first rows, stirrups, second rows.
-function heroLink(option, mode) {
-  const params = new URLSearchParams({ v: "1", l: lang, m: mode });
-  if (mode === "design") params.set("ch", `${option.dataset.sig};;`);
-  else {
-    const face = (signature) => [0, 1, 2, 3].map((index) => groups(signature)[index] || [0, 0]);
-    const [bottom, top] = [face(option.dataset.sig), face(hero.dataset.top)];
-    const [, n, d, s] = /^(\d+)x(\d+)@(\d+)$/.exec(hero.dataset.st);
-    params.set("r", [...bottom[0], ...bottom[1], ...top[0], ...top[1], n, d, s,
-      ...bottom[2], ...bottom[3], ...top[2], ...top[3]].join(","));
-  }
-  return `beam/#${params}`;
+function linkHero(option) {
+  const face = (signature) => [0, 1, 2, 3].map((index) => groups(signature)[index] || [0, 0]);
+  const [bottom, top] = [face(option.dataset.sig), face(hero.dataset.top)];
+  const [, n, d, s] = /^(\d+)x(\d+)@(\d+)$/.exec(hero.dataset.st);
+  const bars = [...bottom[0], ...bottom[1], ...top[0], ...top[1], n, d, s, ...bottom[2], ...bottom[3], ...top[2], ...top[3]];
+  const params = new URLSearchParams({ v: "1", l: lang, m: "check", r: bars.join(",") });
+  hero.querySelector("#hero-check").href = `beam/#${params}`;
 }
 
 function pickOption(option, { animate = true } = {}) {
@@ -74,11 +70,6 @@ function pickOption(option, { animate = true } = {}) {
   }
   old.forEach((circle) => circle.remove());
   linkHero(option);
-}
-
-function linkHero(option) {
-  hero.querySelector("#hero-report").href = heroLink(option, "design");
-  hero.querySelector("#hero-check").href = heroLink(option, "check");
 }
 
 const pickedOption = () => hero.querySelector(".opt:has(input:checked)") || hero.querySelector(".opt");

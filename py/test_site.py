@@ -139,7 +139,7 @@ def test_hero_shows_the_worked_example():
     assert hero["shear_dcr"] == f"{shear['DCR']:.2f}"
     governing = max(bottom["DCR"], top["DCR"], shear["DCR"])
     assert hero["dcr"] == f"{governing:.2f}"
-    assert 0.7 <= min(bottom["DCR"], top["DCR"], shear["DCR"]) and governing <= 0.9
+    assert governing == bottom["DCR"] <= 0.9  # the bottom flexure governs: picking an option moves the verdict
     assert hero["sum_flex"] == f"{max(bottom['DCR'], top['DCR']):.2f}" and hero["sum_shear"] == hero["shear_dcr"]
 
 
@@ -165,6 +165,8 @@ def test_hero_options_are_what_mento_proposes():
             "flexure_top": hero["top_dcr"],
             "shear": hero["shear_dcr"],
         }
+        # and it governs in every option, so the verdict moves with the pick
+        assert max(row["dcr"] for row in picked["ledger"]) == picked["ledger"][0]["dcr"]
         low = [bar for bar in picked["section"]["bars"] if bar["y"] < beam.EXAMPLE["height"] / 2]
         corners = {min(bar["x"] for bar in low), max(bar["x"] for bar in low)}
         between = [f"{bar['x']:g},{bar['y']:g},{bar['d']:g}" for bar in low if bar["x"] not in corners]

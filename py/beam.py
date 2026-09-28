@@ -49,9 +49,9 @@ EXAMPLE: dict[str, Any] = {
     "height": 60,
     "cover": 25,
     "forces": [
-        {"label": "1.4D", "M_y": 55, "V_z": 80, "N_x": 0},
-        {"label": "1.2D+1.6L", "M_y": 92, "V_z": 95, "N_x": 0},
-        {"label": "0.9D+1.0E", "M_y": -45, "V_z": 95, "N_x": 30},
+        {"label": "1.4D", "M_y": 55, "V_z": 45, "N_x": 0},
+        {"label": "1.2D+1.6L", "M_y": 92, "V_z": 70, "N_x": 0},
+        {"label": "0.9D+1.0E", "M_y": -45, "V_z": 65, "N_x": 30},
     ],
 }
 

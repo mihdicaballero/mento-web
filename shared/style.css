@@ -291,13 +291,12 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .viz-prop .more:hover{text-decoration:underline}
 /* the hero is live: another option moves its meter as the calculator's does */
 .viz-verdict .mini .meter i{transition:width .4s var(--ease)}
-.viz-verdict{position:absolute;left:24px;top:376px;width:512px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 14px;box-shadow:0 10px 30px rgba(26,29,33,.08)}
+.viz-verdict{position:absolute;left:24px;top:376px;width:512px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2);display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:center;padding:10px 14px;box-shadow:0 10px 30px rgba(26,29,33,.08)}
 .viz-verdict .word{display:flex;align-items:center;gap:8px;font-size:var(--fs-16);font-weight:600;color:var(--ok-ink)}
 .viz-verdict .word .mark{width:26px;height:26px;border-radius:50%;background:var(--ok);color:#fff;display:inline-flex;align-items:center;justify-content:center}
 .viz-verdict .word .readout{font-size:var(--fs-22);color:var(--ok-ink)}
 .viz-verdict .mini{display:flex;flex-direction:column;gap:5px;font-size:var(--fs-11);color:var(--ink-2)}
 .viz-verdict .mini > div{display:flex;gap:8px;align-items:center} .viz-verdict .mini span:first-child{width:88px} .viz-verdict .mini .meter{flex-grow:1;height:6px} .viz-verdict .mini .num{color:var(--ink)}
-.viz-verdict .btn{font-size:var(--fs-12);padding:8px 12px}
 .viz-verdict .sum-line{display:none;font-size:var(--fs-12);color:var(--ok-ink);text-align:right}
 /* steps */
 .steps-band{padding:40px var(--s-6);border-top:var(--bw) solid var(--line-3);border-bottom:var(--bw) solid var(--line-3)}
@@ -375,7 +374,7 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
   .viz-draw{padding:8px 4px} .viz-draw .eyebrow{display:none} .viz-draw svg{width:110px;height:auto}
   .viz-prop .opt{grid-template-columns:14px minmax(0,1fr) 40px} .viz-prop .opt .area{display:none}
   .viz-verdict{grid-column:1 / span 2;grid-template-columns:auto minmax(0,1fr);background:var(--ok-soft);border-color:var(--ok-line)}
-  .viz-verdict .mini{display:none} .viz-verdict .btn{display:none} .viz-verdict .sum-line{display:block}
+  .viz-verdict .mini{display:none} .viz-verdict .sum-line{display:block}
   .steps-band{padding:28px var(--s-4) 0;border:0} .steps-row{grid-template-columns:1fr;gap:18px;margin-top:14px}
   .calcs{padding:28px var(--s-4) 0} .calcs .head{flex-direction:column;gap:2px} .cgrid--home{grid-template-columns:1fr;grid-template-rows:none;gap:10px}
   .ccard--featured{grid-row:auto;flex-direction:column;padding:18px} .ccard--featured .fig{display:none} .ccard--featured .name{font-size:var(--fs-16)}

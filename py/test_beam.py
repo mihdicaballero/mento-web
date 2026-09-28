@@ -217,7 +217,7 @@ def test_ledger_is_three_rows_capacity_demand_and_governing_combination():
     assert bottom["combo"] == "1.2D+1.6L" and bottom["symbol"] == "ØMn"
     assert bottom["capacity"] > bottom["demand"] == 92.0 and bottom["unit"] == "kNm"
     assert top["combo"] == "0.9D+1.0E"  # the only combination that puts the top in tension
-    assert shear["symbol"] == "ØVn" and shear["demand"] == 95.0 and shear["unit"] == "kN"
+    assert shear["symbol"] == "ØVn" and shear["demand"] == 70.0 and shear["unit"] == "kN"
     assert bottom["complies"] and top["complies"]
     assert max(row["dcr"] for row in ledger) == max(
         solve()["flexure"]["bottom"]["DCR"], solve()["shear"]["DCR"], solve()["flexure"]["top"]["DCR"]
@@ -271,7 +271,7 @@ def test_detailed_results_come_as_tables_too():
     check = flexure["tables"][3]
     assert check["columns"] == ["Unit", "Value", "Min.", "Max.", "Ok?"]
     assert all(len(row) == 6 for row in check["rows"])
-    assert shear["tables"][-1]["rows"][-1][1:3] == ["DCR", "0.89"]
+    assert shear["tables"][-1]["rows"][-1][1:3] == ["DCR", "0.65"]
     assert "BEAM FLEXURE DETAILED RESULTS" in result["detailed"]  # the text stays, for Copiá
 
 
