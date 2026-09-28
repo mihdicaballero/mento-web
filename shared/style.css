@@ -287,7 +287,10 @@ code,.code{font-family:var(--font-mono);font-size:var(--fs-12)}
 .viz-prop .hd{padding:10px 12px 8px;border-bottom:var(--bw) solid var(--line-3);display:flex;align-items:center;gap:8px}
 .viz-prop .hd .eyebrow{color:var(--ink)} .viz-prop .hd .grp-name{margin-left:auto;font-size:var(--fs-11);color:var(--ink-2)}
 .viz-prop .opt{font-size:var(--fs-13);grid-template-columns:18px minmax(0,1fr) 58px 44px;padding:7px 10px}
-.viz-prop .more{padding:8px 12px;font-size:var(--fs-12);color:var(--brand-ink);border-top:var(--bw) solid var(--line-3)}
+.viz-prop .more{display:block;padding:8px 12px;font-size:var(--fs-12);color:var(--brand-ink);border-top:var(--bw) solid var(--line-3);text-decoration:none}
+.viz-prop .more:hover{text-decoration:underline}
+/* the hero is live: another option moves its meter as the calculator's does */
+.viz-verdict .mini .meter i{transition:width .4s var(--ease)}
 .viz-verdict{position:absolute;left:24px;top:376px;width:512px;background:var(--surface);border:var(--bw) solid var(--line-2);border-radius:var(--r-2);display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:14px;align-items:center;padding:10px 14px;box-shadow:0 10px 30px rgba(26,29,33,.08)}
 .viz-verdict .word{display:flex;align-items:center;gap:8px;font-size:var(--fs-16);font-weight:600;color:var(--ok-ink)}
 .viz-verdict .word .mark{width:26px;height:26px;border-radius:50%;background:var(--ok);color:#fff;display:inline-flex;align-items:center;justify-content:center}
