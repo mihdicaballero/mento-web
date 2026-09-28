@@ -37,13 +37,15 @@ def test_a_face_is_one_diameter_at_one_spacing():
     assert result["rebar"]["bot"] == f"Ø{result['layouts']['bot']['d']:g} c/{result['layouts']['bot']['s']:g} cm"
 
 
-def test_alternatives_are_other_diameters_of_the_same_steel():
-    options = solve()["options"]["bot"]
+def test_alternatives_are_the_meshes_mento_offers():
+    result = solve()
+    options = result["options"]["bot"]
     assert len(options) > 1
-    assert len({option["layout"]["d"] for option in options}) == len(options)
+    assert options[0]["bars"] == result["rebar"]["bot"]  # mento's own pick leads
+    assert len({option["signature"] for option in options}) == len(options)
     for option in options:
         assert 10 <= option["layout"]["s"] <= 40  # never tighter than 10 cm, never wider than 3h
-        assert option["dcr"] <= 1.02
+        assert option["dcr"] <= 1 and option["complies"]  # mento offers only meshes that pass
     areas = [float(option["area"].split()[0]) for option in options]
     assert max(areas) - min(areas) < max(areas) * 0.25  # the same steel, laid out differently
 
@@ -99,14 +101,26 @@ def test_report_is_one_word_file_with_flexure_and_shear():
 
 
 def test_the_worked_example_has_no_errors():
-    # its top steel is under the 4/3 of the calculated steel that waives the minimum: a warning,
-    # as mento's table of checks says, not a strength shortfall
-    notices = solve()["notices"]
-    assert not [notice for notice in notices if notice["severity"] == "bad"], notices
-    assert any(notice["code"] == "as_below_min" for notice in notices)
+    result = solve()
+    assert result["notices"] == [] and result["complies"]
+
+
+def test_a_metre_of_10_at_15_is_seven_bars_and_524():
+    """mento counts width / s bars for the area (6.67, 5.24 cm²) and places the whole ones (7)."""
+    result = solve(mode="check", rebar={"bot": {"d": 10, "s": 15}, "top": {}})
+    assert result["placed"]["bot"] == 7 and result["area"]["bot"] == "5.24 cm²/m"
+    assert result["rebar"]["bot"] == "Ø10 c/15 cm"
+    assert len([bar for bar in result["section"]["bars"] if bar["y"] < result["section"]["height"] / 2]) == 7
+
+
+def test_with_no_moment_only_the_bottom_needs_its_minimum():
+    rebar = {"bot": {"d": 6, "s": 30}, "top": {"d": 6, "s": 30}}
+    result = solve(mode="check", code="ACI 318-19", rebar=rebar, forces=[{"label": "U", "M_y": 0, "V_z": 30}])
+    minimum = [notice for notice in result["notices"] if notice["code"] == "As_below_min"]
+    assert [notice["values"]["face"] for notice in minimum] == ["bottom"]
 
 
 def test_bars_closer_than_the_minimum_clear_spacing_fail():
     result = solve(mode="check", rebar={"bot": {"d": 16, "s": 3}, "top": {"d": 12, "s": 25}})
-    spacing = [notice for notice in result["notices"] if notice["code"] == "spacing"]
+    spacing = [notice for notice in result["notices"] if notice["code"] == "bar_spacing_below_min"]
     assert spacing and spacing[0]["severity"] == "bad" and spacing[0]["values"]["face"] == "bottom"

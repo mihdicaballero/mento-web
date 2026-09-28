@@ -53,20 +53,13 @@ def _build(data: dict[str, Any]) -> ShearWall:
 
 
 def _mesh(wall: ShearWall, group: str) -> dict[str, Any]:
-    """The mesh mento designed, read off the wall.
-
-    ShearWall keeps its meshes in ``_d_b_h``/``_s_h`` and ``_d_b_v``/``_s_v`` and exposes no
-    reading of them: ``reinforcement`` and ``shear_design`` still answer as the beam it inherits
-    from, so they describe bars this wall does not have. Until mento exposes the mesh, this is
-    the one place that reaches for it.
-    """
-    diameter = getattr(wall, "_d_b_h" if group == "horizontal" else "_d_b_v", None)
-    spacing = getattr(wall, "_s_h" if group == "horizontal" else "_s_v", None)
-    if diameter is None or spacing is None or spacing.magnitude == 0:
+    """The mesh mento designed, read off the wall (``wall.mesh``; a wall has no ``reinforcement``)."""
+    direction = getattr(wall.mesh, group)
+    if not direction.has_bars:
         return {}
     return {
-        "d": round(float(diameter.to("mm").magnitude), 3),
-        "s": round(float(spacing.to("cm").magnitude), 3),
+        "d": round(float(direction.d_b.to("mm").magnitude), 3),
+        "s": round(float(direction.s.to("cm").magnitude), 3),
     }
 
 
@@ -90,36 +83,26 @@ def _apply(wall: ShearWall, layouts: dict[str, Any]) -> None:
 
 
 def _checked(data: dict[str, Any], forces: list[Forces], layouts: dict[str, Any]) -> tuple[ShearWall, Any]:
-    """A fresh wall with those meshes in it, checked; the check table is the result."""
+    """A fresh wall with those meshes in it, checked; the check table comes back for the page."""
     wall = _build(data)
     _apply(wall, layouts)
     return wall, wall.check_shear(forces)
 
 
-def _governing(frame: Any) -> int:
-    """The row of the check table with the highest DCR, skipping mento's units row."""
-    rows = frame.iloc[1:]
-    return int(rows["DCR"].astype(float).idxmax()) - 1
+def _dcr(wall: ShearWall) -> float:
+    return round(float(wall.shear_design.DCR), 3)
 
 
-def _dcr(frame: Any) -> float:
-    return round(float(frame.iloc[1:]["DCR"].astype(float).max()), 3)
-
-
-def _options(wall: ShearWall, frame: Any, layouts: dict[str, Any], limit: int = 3) -> dict[str, Any]:
+def _options(wall: ShearWall, layouts: dict[str, Any], limit: int = 3) -> dict[str, Any]:
     """Alternative meshes: the same steel ratio with another bar diameter.
 
-    mento designs one mesh per direction and keeps no ranked list, so the alternatives are built
-    from the ratio its own design had to reach — ρt,req for the horizontal mesh, ρl,min for the
-    vertical one — and every one of them is then checked by mento.
+    mento designs one mesh per direction and offers no alternatives for a wall, so they are built
+    from the ratio its own design had to reach, over every combination — ρt,req (never below
+    ρt,min) for the horizontal mesh, ρl,min for the vertical one — and every one of them is then
+    checked by mento.
     """
-    index = _governing(frame)
-    required = {
-        "horizontal": max(
-            float(common.row_value(frame, index, "ρt,req")), float(common.row_value(frame, index, "ρt,min"))
-        ),
-        "vertical": float(common.row_value(frame, index, "ρl,min")),
-    }
+    design = wall.shear_design
+    required = {"horizontal": max(design.rho_t_req, design.rho_t_min), "vertical": design.rho_l_min}
     thickness = float(wall.thickness.to("cm").magnitude)
     options: dict[str, Any] = {}
     for group in GROUPS:
@@ -140,34 +123,23 @@ def _options(wall: ShearWall, frame: Any, layouts: dict[str, Any], limit: int = 
     return options
 
 
-def _ledger(frame: Any, code: str) -> list[dict[str, Any]]:
+def _ledger(wall: ShearWall, code: str) -> list[dict[str, Any]]:
     """One row: in-plane shear, which is the only resistance mento checks on a wall today."""
     symbols = common.CAPACITY.get(code, common.DEFAULT_CAPACITY)
-    index = _governing(frame)
+    # the combination shear_design takes its capacity from: the largest DCR, the smallest ØVn
+    governing = min(wall.shear_checks, key=lambda check: (-check.DCR, check.V_capacity.magnitude))
     return [
         {
             "key": "shear_in_plane",
-            "dcr": round(float(common.row_value(frame, index, "DCR")), 3),
+            "dcr": round(float(governing.DCR), 3),
             "symbol": symbols["V"],
             "demand_symbol": "Vu",
-            "capacity": round(float(common.row_value(frame, index, "ØVn")), 1),
-            "demand": round(float(common.row_value(frame, index, "Vu")), 1),
+            "capacity": common.magnitude(governing.V_capacity, "kN"),
+            "demand": round(abs(float(governing.V_u.to("kN").magnitude)), 1),
             "unit": "kN",
-            "combo": str(common.row_value(frame, index, "Comb.")),
+            "combo": governing.label,
         }
     ]
-
-
-def _notices(reports: list[dict[str, Any]], captured: list[Any]) -> list[dict[str, Any]]:
-    """mento's warnings and its table of checks. Its first two rows are the ratios of the horizontal
-    and the vertical mesh against their minimums, which have a sentence of their own."""
-    named = {0: ("rho_below_min", "horizontal"), 1: ("rho_below_min", "vertical")}
-    notices = common.captured_notices(captured)
-    for notice in common.check_notices(reports[0], named) if reports else []:
-        if notice["code"] == "rho_below_min":
-            notice["values"].update({"A_s": notice["values"]["value"], "limit": notice["values"]["min"]})
-        notices.append(notice)
-    return notices
 
 
 def _section(wall: ShearWall, layouts: dict[str, Any]) -> dict[str, Any]:
@@ -203,9 +175,8 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         layouts = _rebar_layouts(data.get("rebar") or {})
     else:
         designed = _build(data)
-        frame = designed.design_shear(forces)
-        proposal = {group: _mesh(designed, group) for group in GROUPS}
-        options = _options(designed, frame, proposal)
+        designed.design(forces)
+        options = _options(designed, {group: _mesh(designed, group) for group in GROUPS})
         selected, changed = common.select(options, data.get("choice") or {})
         layouts = {group: common.selected_layout(options, group, selected) for group in options}
 
@@ -216,10 +187,10 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
 
     if not check_mode:
 
-        def evaluate(candidate: dict[str, Any], _group: str) -> float:
-            return _dcr(_checked(data, forces, candidate)[1])
+        def evaluate(candidate: dict[str, Any], _group: str) -> tuple[float, None]:
+            return _dcr(_checked(data, forces, candidate)[0]), None
 
-        current = {group: _dcr(frame) for group in options}
+        current = {group: (_dcr(wall), None) for group in options}
         common.fill_option_dcrs(options, selected, current, evaluate)
         # The vertical mesh is minimum steel: it has no DCR of its own, so it shows "—" (6).
         for option in options["vertical"]:
@@ -234,8 +205,9 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "options": options,
         "selected": selected,
         "changed": changed,
-        "ledger": _ledger(frame, data["code"]),
-        "notices": _notices(detailed["reports"], list(captured)),
+        "complies": wall.shear_design.DCR <= 1,
+        "ledger": _ledger(wall, data["code"]),
+        "notices": common.warning_notices(wall, list(captured)),
         "tables": {"shear": common.table(frame)},
         "section": _section(wall, layouts),
         **detailed,
@@ -264,8 +236,8 @@ def report(payload: str) -> str:
         layouts = _rebar_layouts(data.get("rebar") or {})
     else:
         designed = _build(data)
-        frame = designed.design_shear(forces)
-        options = _options(designed, frame, {group: _mesh(designed, group) for group in GROUPS})
+        designed.design(forces)
+        options = _options(designed, {group: _mesh(designed, group) for group in GROUPS})
         selected, _ = common.select(options, data.get("choice") or {})
         layouts = {group: common.selected_layout(options, group, selected) for group in options}
     wall, _ = _checked(data, forces, layouts)

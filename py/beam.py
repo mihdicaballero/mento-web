@@ -29,7 +29,6 @@ from mento import (
     kNm,
     mm,
 )
-from mento.rebar import Rebar
 
 CONCRETES = {
     "ACI 318-19": Concrete_ACI_318_19,
@@ -51,7 +50,7 @@ EXAMPLE: dict[str, Any] = {
     "cover": 25,
     "forces": [
         {"label": "1.4D", "M_y": 55, "V_z": 80, "N_x": 0},
-        {"label": "1.2D+1.6L", "M_y": 90, "V_z": 120, "N_x": 0},
+        {"label": "1.2D+1.6L", "M_y": 92, "V_z": 95, "N_x": 0},
         {"label": "0.9D+1.0E", "M_y": -45, "V_z": 95, "N_x": 30},
     ],
 }
@@ -82,7 +81,7 @@ def _quantity(value: Any, unit: str, precision: int = 2) -> str | None:
 
 
 def _covers(provided: Any, required: Any) -> bool:
-    """Whether the steel placed reaches the steel required (which already includes the minimum)."""
+    """Whether the stirrups placed reach what the shear requires (never below its minimum)."""
     if required is None:
         return True
     return bool(provided.to(required.units).magnitude >= required.magnitude * 0.999)
@@ -232,15 +231,19 @@ def _bars(layers: Any) -> str:
 
 
 def _face(face: Any) -> dict[str, Any]:
+    """One face as mento judges it. ``A_s_min_eff`` is the minimum the face has to meet: under
+    ACI 318-19 and CIRSOC 201-25 the 4/3 of §9.6.1.3 can leave it below ``A_s_min``. ``complies``
+    is the verdict: a DCR of at most 1 and, under those codes, a tension-controlled section."""
     return {
         "bars": _bars(face.layers),
         "A_s": _quantity(face.A_s, "cm**2"),
         "A_s_req": _quantity(face.A_s_req, "cm**2"),
         "A_s_min": _quantity(face.A_s_min, "cm**2"),
+        "A_s_min_eff": _quantity(face.A_s_min_eff, "cm**2"),
         "A_s_max": _quantity(face.A_s_max, "cm**2"),
         "M_capacity": _quantity(face.M_capacity, "kN*m", 1),
         "DCR": round(float(face.DCR), 3),
-        "enough": _covers(face.A_s, face.A_s_req),
+        "complies": bool(face.complies),
     }
 
 
@@ -249,25 +252,40 @@ def _face(face: Any) -> dict[str, Any]:
 # for a face and {"n": 1, "d": 6, "s": 13} for the stirrups. Diameters in mm, spacing in cm.
 
 
-def _layers_layout(layers: Any) -> dict[str, Any]:
-    layout: dict[str, Any] = {}
-    for index, layer in enumerate(layers, start=1):
-        if index > 4 or not layer.n:
-            break
-        layout[f"n{index}"] = int(layer.n)
-        layout[f"d{index}"] = round(float(layer.d_b.to("mm").magnitude), 3)
-    return layout
+_FIT_CODES = ("clear_spacing_below_min", "bars_do_not_fit")
 
 
-def _row_layout(row: dict[str, Any]) -> dict[str, Any]:
-    """The same, from one row of mento's rebar designer."""
+def _fits_one_row(data: dict[str, Any], stirrups: dict[str, Any], face: str, layers: Any) -> bool:
+    """Whether two bar groups fit side by side in the row nearest the face, as mento judges the
+    spacing: on a fresh beam with the stirrups the design finished with, read off its warnings
+    (the bar spacing needs no check)."""
+    probe = _build_beam(data)
+    if stirrups:
+        probe.set_transverse_rebar(n_stirrups=int(stirrups["n"]), d_b=stirrups["d"] * mm, s_l=stirrups["s"] * cm)
+    first, second = layers
+    setter = probe.set_longitudinal_rebar_bot if face == "bot" else probe.set_longitudinal_rebar_top
+    setter(n1=int(first.n), d_b1=first.d_b, n2=int(second.n), d_b2=second.d_b)
+    name = "bottom" if face == "bot" else "top"
+    return not any(warning.code in _FIT_CODES and warning.face == name for warning in probe.warnings)
+
+
+def _layers_layout(data: dict[str, Any], stirrups: dict[str, Any], face: str, layers: Any) -> dict[str, Any]:
+    """A face's layout, with the row of every group, from the layers of a mento ``RebarOption``.
+
+    Those layers are the groups n_1..n_4 of the search that carry bars, in order, so an empty
+    group leaves no trace: two layers are n_1 + n_2 in one row, or n_1 and n_3 in two, and three
+    are n_1 + n_2 | n_3 or n_1 | n_3 + n_4. The search ranks a second row below a first that
+    holds the same bars, and mento keeps one option per set of layers, the better ranked; so the
+    groups go in the first row when they fit there and in the second when they do not.
+    """
+    layers = [layer for layer in layers if layer.n][:4]
+    slots = (1, 2, 3, 4)
+    if len(layers) in (2, 3) and not _fits_one_row(data, stirrups, face, layers[:2]):
+        slots = (1, 3, 4)
     layout: dict[str, Any] = {}
-    for index in range(1, 5):
-        n = int(row.get(f"n_{index}") or 0)
-        diameter = row.get(f"d_b{index}")
-        if n and diameter is not None:
-            layout[f"n{index}"] = n
-            layout[f"d{index}"] = round(float(diameter.to("mm").magnitude), 3)
+    for slot, layer in zip(slots, layers, strict=False):
+        layout[f"n{slot}"] = int(layer.n)
+        layout[f"d{slot}"] = round(float(layer.d_b.to("mm").magnitude), 3)
     return layout
 
 
@@ -361,24 +379,6 @@ def _apply_layouts(beam: RectangularBeam, layouts: dict[str, Any]) -> None:
         beam.set_transverse_rebar(n_stirrups=int(stirrups["n"]), d_b=stirrups["d"] * mm, s_l=stirrups["s"] * cm)
 
 
-def _current_layouts(beam: RectangularBeam) -> dict[str, Any]:
-    """What the design left on the beam. ``reinforcement`` lists only the groups that carry bars,
-    so a second row with no inner bars in the first would read as the first row's inner bars.
-    The designer's own row (``flexure_design_results_*``, n_1 to n_4) keeps each in its row."""
-    reinforcement = beam.reinforcement
-
-    def face(results: Any, layers: Any) -> dict[str, Any]:
-        if results is not None:
-            return _row_layout(results.to_dict())
-        return _layers_layout(layers)
-
-    return {
-        "bot": face(getattr(beam, "flexure_design_results_bot", None), reinforcement.bottom.layers),
-        "top": face(getattr(beam, "flexure_design_results_top", None), reinforcement.top.layers),
-        "st": _stirrup_layout(reinforcement.transverse),
-    }
-
-
 # ----------------------------------------------------------------- design options
 
 
@@ -392,11 +392,12 @@ def _checked(data: dict[str, Any], forces: list[Forces], layouts: dict[str, Any]
     return beam, node
 
 
-def _group_dcr(beam: RectangularBeam, group: str) -> float:
+def _group_state(beam: RectangularBeam, group: str) -> tuple[float, bool | None]:
+    """The DCR of one rebar group on a checked beam, and whether that face complies."""
     if group == "st":
-        return round(float(beam.shear_design.DCR), 3)
+        return round(float(beam.shear_design.DCR), 3), None
     face = beam.flexure_design.bottom if group == "bot" else beam.flexure_design.top
-    return round(float(face.DCR), 3)
+    return round(float(face.DCR), 3), bool(face.complies)
 
 
 def _selected_layout(options: dict[str, Any], group: str, selected: dict[str, int]) -> dict[str, Any]:
@@ -405,83 +406,45 @@ def _selected_layout(options: dict[str, Any], group: str, selected: dict[str, in
     return group_options[index].get("layout", {})
 
 
-def _long_options(beam: RectangularBeam, face: Any, chosen: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    """The layouts mento's designer ranked for this face, its own pick first.
+def _options(data: dict[str, Any], beam: RectangularBeam) -> dict[str, list[dict[str, Any]]]:
+    """The layouts mento's design offers for each group, the applied one first.
 
-    mento keeps only the winner: ``flexure_design_results_bot`` is a single row and the ``Rebar``
-    that ranked the rest is a local of the design. So the ranking is rebuilt here with the same
-    public search; until mento exposes it, this is the only way to offer a second option.
+    ``options[0]`` is what the design applied; the rest are alternatives mento built on the
+    finished section and kept only if it passes with them, so there may be fewer than asked for.
     """
-    layouts = [chosen] if chosen else []
-    if face.A_s_req is None:
-        return layouts
-    try:
-        # The ACI selector by name, but it is the selector every code uses: EN 1992 delegates to
-        # it (choosing bars is geometry, not code) and its wrapper returns nothing to read.
-        frame = Rebar(beam).longitudinal_rebar_ACI_318_19(face.A_s_req, face.A_s_max, None)
-    except Exception:  # noqa: BLE001 - having no alternative is not an error
-        return layouts
-    seen = {_signature(layout) for layout in layouts}
-    for row in frame.to_dict("records"):
-        layout = _row_layout(row)
-        if not layout or _signature(layout) in seen:
-            continue
-        seen.add(_signature(layout))
-        layouts.append(layout)
-        if len(layouts) == limit:
-            break
-    return layouts
-
-
-def _stirrup_options(beam: RectangularBeam, chosen: dict[str, Any], limit: int) -> list[dict[str, Any]]:
-    """``beam.shear_design_results`` is public, but it holds one row per diameter at the first
-    spacing that works, so rows sharing a spacing differ only in bar size: more steel and no
-    trade-off. Those are dropped, and what is left is a real choice."""
-    layouts = [chosen] if chosen else []
-    frame = getattr(beam, "shear_design_results", None)
-    if frame is None or frame.empty:
-        return layouts
-    lightest: dict[tuple[int, float], dict[str, Any]] = {}
-    for row in frame.to_dict("records"):
-        layout = {
-            "n": int(row["n_stir"]),
-            "d": round(float(row["d_b"].to("mm").magnitude), 3),
-            "s": round(float(row["s_l"].to("cm").magnitude), 3),
+    stirrups = [
+        {
+            "n": int(option.n_stirrups),
+            "d": round(float(option.d_b.to("mm").magnitude), 3),
+            "s": round(float(option.s_l.to("cm").magnitude), 3),
         }
-        key = (layout["n"], layout["s"])
-        if key not in lightest or layout["d"] < lightest[key]["d"]:
-            lightest[key] = layout
-    seen = {_signature(layout) for layout in layouts}
-    for layout in sorted(lightest.values(), key=lambda item: (item["n"], item["d"] ** 2 / item["s"])):
-        if _signature(layout) in seen:
-            continue
-        seen.add(_signature(layout))
-        layouts.append(layout)
-        if len(layouts) == limit:
-            break
-    return layouts
-
-
-def _options(beam: RectangularBeam, layouts: dict[str, Any], limit: int = 3) -> dict[str, list[dict[str, Any]]]:
+        for option in beam.shear_design.options
+    ] or [_stirrup_layout(beam.reinforcement.transverse)]
+    flexure = beam.flexure_design
     candidates = {
-        "bot": _long_options(beam, beam.flexure_design.bottom, layouts["bot"], limit),
-        "top": _long_options(beam, beam.flexure_design.top, layouts["top"], limit),
-        "st": _stirrup_options(beam, layouts["st"], limit),
+        group: [_layers_layout(data, stirrups[0], group, option.layers) for option in face.options]
+        or [_layers_layout(data, stirrups[0], group, face.layers)]
+        for group, face in (("bot", flexure.bottom), ("top", flexure.top))
     }
-    return {
-        group: [
-            {
-                "bars": _layout_bars(layout),
-                "rows": _layout_rows(layout),
-                "area": _layout_area(layout),
-                "signature": _signature(layout),
-                "layout": layout,
-            }
-            for layout in group_layouts
-            if layout
-        ]
-        for group, group_layouts in candidates.items()
-    }
+    candidates["st"] = stirrups
+    options: dict[str, list[dict[str, Any]]] = {}
+    for group, layouts in candidates.items():
+        seen: set[str] = set()
+        options[group] = []
+        for layout in layouts:
+            if not layout or _signature(layout) in seen:
+                continue
+            seen.add(_signature(layout))
+            options[group].append(
+                {
+                    "bars": _layout_bars(layout),
+                    "rows": _layout_rows(layout),
+                    "area": _layout_area(layout),
+                    "signature": _signature(layout),
+                    "layout": layout,
+                }
+            )
+    return options
 
 
 def _fill_option_dcrs(
@@ -489,18 +452,20 @@ def _fill_option_dcrs(
     forces: list[Forces],
     options: dict[str, Any],
     selected: dict[str, int],
-    current: dict[str, float],
+    current: dict[str, tuple[float, bool | None]],
 ) -> None:
-    """The DCR beside an option is that option's, with the rest of the section as it stands."""
+    """The DCR beside an option is its own group's, with the rest of the section as the user has
+    it. mento's ``section_DCR`` is the worst of the whole section with the rest as the design
+    applied it: the same for most options, and blind to a choice made in another group."""
     for group, group_options in options.items():
         for index, option in enumerate(group_options):
             if index == selected.get(group, 0):
-                option["dcr"] = current.get(group)
+                option["dcr"], option["complies"] = current[group]
                 continue
             layouts = {name: _selected_layout(options, name, selected) for name in options}
             layouts[group] = option["layout"]
             beam, _ = _checked(data, forces, layouts)
-            option["dcr"] = _group_dcr(beam, group)
+            option["dcr"], option["complies"] = _group_state(beam, group)
 
 
 def _select(options: dict[str, Any], choice: dict[str, Any]) -> tuple[dict[str, int], list[str]]:
@@ -522,54 +487,6 @@ def _select(options: dict[str, Any], choice: dict[str, Any]) -> tuple[dict[str, 
 
 # ------------------------------------------------------------- verdict and notices
 
-CAPACITY = {"EN 1992-2004": {"M": "MRd", "V": "VRd"}}
-DEFAULT_CAPACITY = {"M": "ØMn", "V": "ØVn"}
-
-
-def _ledger(beam: RectangularBeam, forces: list[Forces], code: str) -> list[dict[str, Any]]:
-    """One row per resistance check mento reports with a DCR: bottom flexure, top flexure, shear.
-    Minimums and spacing limits are notices, not rows."""
-    symbols = CAPACITY.get(code, DEFAULT_CAPACITY)
-    demands = {force.label: force for force in forces}
-    rows: list[dict[str, Any]] = []
-
-    for key, name in (("flexure_bottom", "bottom"), ("flexure_top", "top")):
-        checks = beam.flexure_check_results(forces)
-        governing = max(checks, key=lambda check, name=name: getattr(check, name).DCR)
-        check = getattr(governing, name)
-        moment = float(demands[governing.label].M_y.to("kN*m").magnitude)
-        loaded = moment > 0 if name == "bottom" else moment < 0
-        rows.append(
-            {
-                "key": key,
-                "dcr": round(float(check.DCR), 3) if loaded else None,
-                "symbol": symbols["M"],
-                "demand_symbol": "Mu",
-                "capacity": round(float(check.M_capacity.to("kN*m").magnitude), 1) if check.M_capacity else None,
-                "demand": round(abs(moment), 1) if loaded else None,
-                "unit": "kNm",
-                "combo": governing.label if loaded else None,
-            }
-        )
-
-    governing_shear = max(beam.shear_check_results(forces), key=lambda check: check.DCR)
-    shear_demand = abs(float(demands[governing_shear.label].V_z.to("kN").magnitude))
-    rows.append(
-        {
-            "key": "shear",
-            "dcr": round(float(governing_shear.DCR), 3),
-            "symbol": symbols["V"],
-            "demand_symbol": "Vu",
-            "capacity": round(float(governing_shear.V_capacity.to("kN").magnitude), 1)
-            if governing_shear.V_capacity
-            else None,
-            "demand": round(shear_demand, 1),
-            "unit": "kN",
-            "combo": governing_shear.label,
-        }
-    )
-    return rows
-
 
 def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
@@ -585,7 +502,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
     else:
         designed = _build_beam(data)
         Node(section=designed, forces=forces).design()
-        options = _options(designed, _current_layouts(designed))
+        options = _options(data, designed)
         selected, changed = _select(options, data.get("choice") or {})
         layouts = {group: _selected_layout(options, group, selected) for group in options}
 
@@ -596,7 +513,7 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         shear_table = node.check_shear()
 
     if not check_mode:
-        current = {group: _group_dcr(beam, group) for group in options}
+        current = {group: _group_state(beam, group) for group in options}
         _fill_option_dcrs(data, forces, options, selected, current)
 
     flexure = beam.flexure_design
@@ -612,8 +529,9 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "options": options,
         "selected": selected,
         "changed": changed,
-        "ledger": _ledger(beam, forces, data["code"]),
-        "notices": common.flexure_notices(beam, forces, detailed["reports"], list(captured)),
+        "complies": bool(flexure.complies) and shear.DCR <= 1,
+        "ledger": [*common.flexure_rows(beam, forces, data["code"]), common.shear_row(beam, forces, data["code"])],
+        "notices": common.warning_notices(node, list(captured)),
         "flexure": {"bottom": _face(flexure.bottom), "top": _face(flexure.top)},
         "shear": {
             "stirrups": _layout_bars(layouts.get("st") or {}),
@@ -652,7 +570,7 @@ def report(payload: str) -> str:
     else:
         designed = _build_beam(data)
         Node(section=designed, forces=forces).design()
-        options = _options(designed, _current_layouts(designed))
+        options = _options(data, designed)
         selected, _ = _select(options, data.get("choice") or {})
         layouts = {group: _selected_layout(options, group, selected) for group in options}
     beam, node = _checked(data, forces, layouts)

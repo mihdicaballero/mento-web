@@ -222,7 +222,24 @@ export async function start(spec) {
     timer = setTimeout(calculate, now ? 0 : 250);
   }
 
+  // One run at a time: a design takes a few tenths of a second natively and several times that in
+  // Pyodide, so edits made meanwhile wait for it and go as one run of the latest inputs, instead
+  // of queueing in the worker a run per pause whose results would be thrown away.
+  let running = false;
+  let queued = false;
+
   async function calculate() {
+    if (running) { queued = true; return; }
+    running = true;
+    try {
+      await calculateOnce();
+    } finally {
+      running = false;
+      if (queued) { queued = false; calculate(); }
+    }
+  }
+
+  async function calculateOnce() {
     const mine = version;
     $("result").classList.add("is-computing");
     clearTimeout(staleTimer);
@@ -255,7 +272,8 @@ export async function start(spec) {
   function showSaved() {
     try {
       const saved = JSON.parse(localStorage.getItem(SAVED_KEY));
-      if (saved?.payload !== JSON.stringify(payload()) || !saved.result?.ok) return;
+      // a result without "complies" is from before mento 1.3.0: its verdict read the DCR alone
+      if (saved?.payload !== JSON.stringify(payload()) || !saved.result?.ok || !("complies" in saved.result)) return;
       applied = version;
       render(saved.result);
     } catch {
@@ -357,9 +375,11 @@ export async function start(spec) {
     $("verdict").hidden = false;
 
     const governing = Math.max(...result.ledger.map((row) => row.dcr ?? 0));
-    // A check mento fails that has no ratio of its own (steel short of what is required, bars that
-    // do not fit) fails the element as a DCR above one would: the number stays, the word says why not.
-    const failed = result.notices.some((item) => item.severity === "bad");
+    // The DCR alone does not decide. A limit of the code the section misses (mento's warnings: the
+    // minimum steel, bars that do not fit) fails it as a DCR above one would, and so does a section
+    // mento says does not comply (ACI/CIRSOC: not tension-controlled, whatever its DCR). The number
+    // stays; the word and the notices say why not.
+    const failed = result.complies === false || result.notices.some((item) => item.severity === "bad");
     const status = failed ? "bad" : dcrState(governing);
     const word = status === "bad" ? t.fails : status === "warn" ? t.passes_limit : t.passes;
     const before = lastResult;  // what the screen shows now, for the movement from it to this
@@ -386,9 +406,10 @@ export async function start(spec) {
       const detail = row.combo
         ? `${row.symbol} ${row.capacity} ${row.dcr > 1 ? "&lt;" : "≥"} ${row.demand_symbol} ${row.demand} ${row.unit} · ${row.combo}`
         : `${row.symbol} ${row.capacity} ${row.unit} · ${t.no_demand}`;
+      const state = rowState(row);
       return `<div class="row"><div><div class="name">${t[row.key]}</div><div class="detail">${detail}</div></div>`
-        + `<div class="meter" data-state="${dcrState(row.dcr)}"><i style="width:${width}%"></i><s></s></div>`
-        + `<span class="dcr ${dcrState(row.dcr)}">${two(row.dcr)}</span></div>`;
+        + `<div class="meter" data-state="${state}"><i style="width:${width}%"></i><s></s></div>`
+        + `<span class="dcr ${state}">${two(row.dcr)}</span></div>`;
     }).join("");
     result.ledger.forEach((row, index) => {
       const line = $("ledger").children[index];
@@ -471,10 +492,12 @@ export async function start(spec) {
       $("detailed").innerHTML = `<pre class="textblock">${escapeHtml(result.detailed)}</pre>`;
       return;
     }
+    // A cross may carry the clause it fails under ("❌ 9.3.3.1": not tension-controlled): kept beside it.
     const mark = (value) => {
-      const [kind, icon, word] = value === "✅" ? ["ok", "i-check", t.passes] : value === "❌" ? ["bad", "i-cross", t.fails] : [];
+      const clause = value.startsWith("❌") ? value.slice(1).trim() : "";
+      const [kind, icon, word] = value === "✅" ? ["ok", "i-check", t.passes] : value.startsWith("❌") ? ["bad", "i-cross", t.fails] : [];
       return kind ? `<span class="dtl-mark ${kind}" title="${word}"><svg width="12" height="12" aria-hidden="true"><use href="#${icon}"/></svg>`
-        + `<span class="vh">${word}</span></span>` : null;
+        + `<span class="vh">${word}</span>${escapeHtml(clause)}</span>` : null;
     };
     const cellHtml = (value) => mark(value) ?? escapeHtml(value);
     const card = (table) => {
@@ -518,22 +541,17 @@ export async function start(spec) {
     setButtons(false);
   }
 
+  // mento words its warnings in the page's language (the glue sets it), so the page shows them as
+  // they come, with the combinations they hold under. Their codes (not_tension_controlled,
+  // As_below_min...) are mento's, stable, and kept on the notice; the page does not reword them.
   function noticeText(item) {
-    const values = item.values || {};
     const lead = `<b>${item.severity === "bad" ? t.notice_bad : t.notice}</b>`;
-    if (item.code === "mento") return `${lead} ${values.message}`;
-    // a beam's and a slab's faces are top and bottom (top_l, bot_l), a wall's its two meshes
-    const face = t[{ top: "top_l", bottom: "bot_l" }[values.face] ?? `${values.face}_l`] ?? "";
-    // a check of mento's own table: the bound it misses, when it names one
-    const value = Number(values.value);
-    const limit = values.min !== "" && value < Number(values.min) ? ` &lt; ${t.min_short} ${values.min}`
-      : values.max !== "" && value > Number(values.max) ? ` &gt; ${t.max_short} ${values.max}` : "";
-    const fill = {
-      face, A_s: values.A_s, limit: item.code === "mento_check" ? limit : values.limit, combo: values.combo,
-      why: values.why ? t[`why_${values.why}`] : "", value: values.value, min: values.min, unit: values.unit, label: values.label,
-    };
-    return `${lead} ${t[item.code].replace(/\{(\w+)\}/g, (all, key) => fill[key] ?? all)}`;
+    const combos = item.values?.combos?.length ? ` <span class="mono">· ${escapeHtml(item.values.combos.join(", "))}</span>` : "";
+    return `${lead} ${escapeHtml(item.message ?? item.values?.message ?? "")}${combos}`;
   }
+
+  // A ledger row or an option that mento says does not comply is red whatever its DCR.
+  const rowState = (row) => (row.complies === false ? "bad" : dcrState(row.dcr));
 
   // A layout's bars as the page writes them: its first row, and its second under it when it has one.
   const barsHtml = (option) => (option.rows?.length > 1
@@ -551,11 +569,11 @@ export async function start(spec) {
       const rows = options.map((option, index) => `
         <label class="opt"><input type="radio" name="g-${key}" value="${option.signature}"${index === selected ? " checked" : ""}>
           <span class="val">${barsHtml(option)}</span><span class="area">${option.area}</span>
-          <span class="dcr ${dcrState(option.dcr)}">${two(option.dcr)}</span></label>`).join("");
+          <span class="dcr ${rowState(option)}">${two(option.dcr)}</span></label>`).join("");
       return `<div class="grp${isOpen ? " is-open" : ""}" data-group="${key}" role="radiogroup" aria-labelledby="g-${key}-label">
         <button class="hd" type="button" aria-expanded="${isOpen}" aria-controls="g-${key}-opts">
           <span class="lbl" id="g-${key}-label">${t[label]}</span>
-          <span class="val">${barsHtml(current)}</span><span class="dcr ${dcrState(current.dcr)}">${two(current.dcr)}</span>
+          <span class="val">${barsHtml(current)}</span><span class="dcr ${rowState(current)}">${two(current.dcr)}</span>
           <span class="chev" aria-hidden="true">${isOpen ? "▾" : "▸"}</span></button>
         <div id="g-${key}-opts"${isOpen ? "" : " hidden"}>${rows}</div></div>`;
     }).join("");
