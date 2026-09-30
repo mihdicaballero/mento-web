@@ -499,9 +499,7 @@ input[type="number"]::-webkit-inner-spin-button,input[type="number"]::-webkit-ou
   .band-grid,.pysec{grid-template-columns:minmax(0,1fr)}
 }
 @container calc (max-width:720px){
-  /* the home's header carries the language and the units switches: Python is a scroll away, Docs in the footer */
-  .top .nav-firms,.top .nav-py,.top .nav-docs{display:none}
-  .home .top .title{display:none}  /* "Calculators" says what the brand does, and would be cut to "Ca…" */
+  .top .nav-firms{display:none}
   .vsteps{grid-template-columns:1fr;gap:14px}
   .band .band-cols{margin-top:22px;padding-top:18px}
   .pysec{grid-template-columns:minmax(0,1fr);padding:28px var(--s-4) 0;gap:22px}

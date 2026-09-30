@@ -1,17 +1,19 @@
-// Home: its movement, language and units, the test count CI publishes, and a head start on the calculator.
-import { applyStrings, loadStrings, preferredLang, preferredUnits, rememberLang, rememberUnits } from "./shared/i18n.js";
+// Home: its movement, language, the test count CI publishes, and a head start on the calculator.
+import { applyStrings, loadStrings, preferredLang, rememberLang } from "./shared/i18n.js";
 import { calm, radiogroup, tween } from "./shared/ui.js";
 
 // ------------------------------------------------------------ the hero in US units
-// The markup is the metric example. A visitor in US units gets beam/'s US example instead (the
-// JSON under the hero, which py/test_site.py checks against mento), drawn in the same frame: the
-// section's height takes the 300 px the metric one does, and everything else scales with it. First
-// thing, like the movement below, so the metric hero never shows to a US visitor and then changes.
+// The markup is the metric example. The page in English shows beam/'s US example instead (the JSON
+// under the hero, which py/test_site.py checks against mento): the home has no units switch, its
+// units are its language's (the calculators keep their own). Drawn in the same frame: the section's
+// height takes the 300 px the metric one does, and everything else scales with it. First thing, like
+// the movement below, so the metric hero never shows in English and then changes.
 const hero = document.getElementById("hero");
 const card = document.querySelector(".ccard--featured .fig svg");
 const HERO_SI = { hero: hero.innerHTML, top: hero.dataset.top, st: hero.dataset.st, card: card.innerHTML };
 const HERO_US = JSON.parse(document.getElementById("hero-us").textContent);
-let units = preferredUnits();
+const unitsOf = (language) => (language === "en" ? "us" : "si");
+let units = unitsOf(preferredLang());
 
 function beamDrawing(data, hooks) {
   const scale = 300 / data.height;
@@ -187,15 +189,7 @@ let lang = preferredLang();
 const langGroup = radiogroup(document.querySelector(".top .seg"), (button) => {
   lang = button.dataset.lang;
   rememberLang(lang);
-  applyStrings(strings, lang, document, units);
-  linkHero(pickedOption());
-});
-const markUnits = () => document.querySelectorAll("#units [data-units]")
-  .forEach((button) => button.setAttribute("aria-checked", String(button.dataset.units === units)));
-markUnits();
-radiogroup(document.getElementById("units"), (button) => {
-  units = button.dataset.units;
-  rememberUnits(units);
+  units = unitsOf(lang);
   showUnits(units);
   applyStrings(strings, lang, document, units);
   linkHero(pickedOption());

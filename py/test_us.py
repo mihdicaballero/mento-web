@@ -14,8 +14,8 @@ import slab
 import wall
 
 MODULES = [beam, slab, wall]
-BARS = re.compile(r"\d+#\d+( \+ \d+#\d+)*")  # 2#6 + 1#4
-MESH = re.compile(r"(\d+×)?#\d+ @ \d+(\.\d+)? in")  # #4 @ 12 in, 2×#3 @ 8 in
+BARS = re.compile(r"\d+#\d+(\+\d+#\d+)*")  # 2#6+1#4
+MESH = re.compile(r"(\d+×)?#\d+@\d+(\.\d+)?in")  # #4@12in, 2×#3@8in
 
 
 def solve(module, **changes):
@@ -74,7 +74,7 @@ def test_check_mode_takes_bar_sizes_and_inches():
     rebar = {"bot": {"n1": 3, "d1": 6}, "top": {"n1": 2, "d1": 5}, "stirrups": {"n": 1, "d": 3, "s": 8}}
     result = solve(beam, mode="check", rebar=rebar)
     assert result["ok"], result
-    assert result["rebar"] == {"bot": "3#6", "top": "2#5", "st": "#3 @ 8 in"}
+    assert result["rebar"] == {"bot": "3#6", "top": "2#5", "st": "#3@8in"}
     assert result["flexure"]["bottom"]["A_s"] == "1.33 in²"  # three 0.75 in bars
     assert result["section"]["stirrups"] == {"n": 1, "d": 0.375}
     assert sorted(bar["d"] for bar in result["section"]["bars"]) == [0.625, 0.625, 0.75, 0.75, 0.75]
@@ -82,14 +82,14 @@ def test_check_mode_takes_bar_sizes_and_inches():
 
 def test_two_stirrups_are_counted_before_the_bar():
     rebar = {"bot": {"n1": 3, "d1": 6}, "top": {}, "stirrups": {"n": 2, "d": 3, "s": 8}}
-    assert solve(beam, mode="check", rebar=rebar)["rebar"]["st"] == "2×#3 @ 8 in"
+    assert solve(beam, mode="check", rebar=rebar)["rebar"]["st"] == "2×#3@8in"
 
 
 def test_a_slab_and_a_wall_check_the_mesh_typed():
     result = solve(slab, mode="check", rebar={"bot": {"d": 4, "s": 12}, "top": {}})
-    assert result["rebar"]["bot"] == "#4 @ 12 in" and result["area"]["bot"] == "0.20 in²/ft"
+    assert result["rebar"]["bot"] == "#4@12in" and result["area"]["bot"] == "0.20 in²/ft"
     result = solve(wall, mode="check", rebar={"horizontal": {"d": 4, "s": 12}, "vertical": {"d": 4, "s": 12}})
-    assert result["rebar"] == {"horizontal": "#4 @ 12 in", "vertical": "#4 @ 12 in"}
+    assert result["rebar"] == {"horizontal": "#4@12in", "vertical": "#4@12in"}
 
 
 def test_a_bar_size_that_does_not_exist_is_an_input_error():

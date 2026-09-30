@@ -43,7 +43,7 @@ function drawing(result, t, phone, U) {
     parts.push(`<circle class="dw-bar" cx="${(x0 + bar.x * scale).toFixed(2)}"`
       + ` cy="${(y0 + (height - bar.y) * scale).toFixed(2)}" r="${Math.max(1.8, (bar.d / 2) * scale).toFixed(2)}"/>`);
   }
-  // Ø10 c/15 cm is 6.67 bars a metre, and 5.24 cm²/m, but 7 bars are placed: mento counts both
+  // Ø10c/15cm is 6.67 bars a metre, and 5.24 cm²/m, but 7 bars are placed: mento counts both
   const label = (group) => [result.rebar[group], result.placed && t.bars_n.replace("{n}", result.placed[group]), result.area?.[group]]
     .filter(Boolean).join(" · ");
   if (result.rebar.top) parts.push(`<text class="dw-label" x="${x0}" y="${y0 - 10}">${label("top")}</text>`);

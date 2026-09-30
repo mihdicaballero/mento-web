@@ -391,12 +391,12 @@ def signature(layout: dict[str, Any]) -> str:
 
 
 def mesh_bars(layout: dict[str, Any], units: Units) -> str:
-    """``Ø10 c/15 cm``, or ``#4 @ 12 in`` as a US drawing calls it."""
+    """``Ø10c/15cm``, or ``#4@12in`` as a US drawing calls it: compact, as a drawing labels it."""
     if not layout:
         return ""
     if units.us:
-        return f"{units.bar_name(layout['d'])} @ {layout['s']:g} in"
-    return f"{units.bar_name(layout['d'])} c/{layout['s']:g} cm"
+        return f"{units.bar_name(layout['d'])}@{layout['s']:g}in"
+    return f"{units.bar_name(layout['d'])}c/{layout['s']:g}cm"
 
 
 def mesh_area(layout: dict[str, Any], units: Units, curtains: int = 1) -> str:

@@ -34,7 +34,7 @@ def test_the_worked_example_is_used_between_07_and_09():
 def test_a_face_is_one_diameter_at_one_spacing():
     result = solve()
     assert result["layouts"]["bot"].keys() == {"d", "s"}
-    assert result["rebar"]["bot"] == f"Ø{result['layouts']['bot']['d']:g} c/{result['layouts']['bot']['s']:g} cm"
+    assert result["rebar"]["bot"] == f"Ø{result['layouts']['bot']['d']:g}c/{result['layouts']['bot']['s']:g}cm"
 
 
 def test_alternatives_are_the_meshes_mento_offers():
@@ -68,7 +68,7 @@ def test_ledger_is_bottom_flexure_top_flexure_and_shear():
 def test_check_mode_takes_the_mesh_the_user_typed():
     result = solve(mode="check", rebar={"bot": {"d": 12, "s": 15}, "top": {"d": 10, "s": 20}})
     assert result["ok"], result
-    assert result["rebar"] == {"bot": "Ø12 c/15 cm", "top": "Ø10 c/20 cm"}
+    assert result["rebar"] == {"bot": "Ø12c/15cm", "top": "Ø10c/20cm"}
     assert result["options"] == {}
 
 
@@ -109,7 +109,7 @@ def test_a_metre_of_10_at_15_is_seven_bars_and_524():
     """mento counts width / s bars for the area (6.67, 5.24 cm²) and places the whole ones (7)."""
     result = solve(mode="check", rebar={"bot": {"d": 10, "s": 15}, "top": {}})
     assert result["placed"]["bot"] == 7 and result["area"]["bot"] == "5.24 cm²/m"
-    assert result["rebar"]["bot"] == "Ø10 c/15 cm"
+    assert result["rebar"]["bot"] == "Ø10c/15cm"
     assert len([bar for bar in result["section"]["bars"] if bar["y"] < result["section"]["height"] / 2]) == 7
 
 

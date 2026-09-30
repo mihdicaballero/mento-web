@@ -149,11 +149,11 @@ def _section(beam: RectangularBeam, layouts: dict[str, Any], units: common.Units
 
 
 def _group_bars(row: list[tuple[int, float]], units: common.Units) -> str:
-    """``2Ø16 + 1Ø12`` (``2#5 + 1#4``) for one row: bars of one size counted together."""
+    """``2Ø16+1Ø12`` (``2#5+1#4``) for one row: bars of one size counted together."""
     counts: dict[float, int] = {}
     for n, d in row:
         counts[d] = counts.get(d, 0) + n
-    return " + ".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
 def _cell(value: Any) -> str:
@@ -181,12 +181,12 @@ def _table(frame: Any) -> dict[str, Any]:
 
 
 def _bars(layers: Any, units: common.Units) -> str:
-    """``3Ø16 + 2Ø12``: bars of one size are counted together, the way they are ordered on site."""
+    """``3Ø16+2Ø12``: bars of one size are counted together, the way they are ordered on site."""
     counts: dict[float, int] = {}
     for layer in layers:
         d = units.bar_of(layer.d_b)
         counts[d] = counts.get(d, 0) + layer.n
-    return " + ".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
 def _face(face: Any, units: common.Units) -> dict[str, Any]:
@@ -292,24 +292,24 @@ def _signature(layout: dict[str, Any]) -> str:
 
 
 def _layout_bars(layout: dict[str, Any], units: common.Units) -> str:
-    """``3Ø16 + 1Ø12`` and ``1eØ6/13 cm``; ``3#5 + 1#4`` and ``#3 @ 5 in`` (``2×#3 @ 5 in``)."""
+    """``3Ø16+1Ø12`` and ``1eØ6/13cm``; ``3#5+1#4`` and ``#3@5in`` (``2×#3@5in``)."""
     if not layout:
         return ""
     if "n" in layout:
         if units.us:
             count = "" if layout["n"] == 1 else f"{layout['n']:g}×"
-            return f"{count}{units.bar_name(layout['d'])} @ {layout['s']:g} in"
-        return f"{layout['n']:g}e{units.bar_name(layout['d'])}/{layout['s']:g} cm"
+            return f"{count}{units.bar_name(layout['d'])}@{layout['s']:g}in"
+        return f"{layout['n']:g}e{units.bar_name(layout['d'])}/{layout['s']:g}cm"
     counts: dict[float, int] = {}
     for index in range(1, 5):
         n = int(layout.get(f"n{index}") or 0)
         if n:
             counts[layout[f"d{index}"]] = counts.get(layout[f"d{index}"], 0) + n
-    return " + ".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
 def _layout_rows(layout: dict[str, Any], units: common.Units) -> list[str]:
-    """The bars of a face, one string per row: ``["2Ø16 + 1Ø12", "2Ø12"]``."""
+    """The bars of a face, one string per row: ``["2Ø16+1Ø12", "2Ø12"]``."""
     if not layout or "n" in layout:
         return [_layout_bars(layout, units)] if layout else []
     return [_group_bars(row, units) for row in _rows(layout)]

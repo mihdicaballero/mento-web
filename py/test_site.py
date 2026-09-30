@@ -22,8 +22,8 @@ PAGES = {
 }
 LANGS = ("es", "en")
 # Engineering notation, the same in every language: numbers and areas, bar layouts such as
-# "2Ø16 + 1Ø12", the symbols the design system uses as field labels (M, V, c/, eØ) and units.
-NOTATION = re.compile(r"[\d.]+( cm²)?|\d+Ø\d+( \+ \d+Ø\d+)*|[A-Za-zØ+×·/−]{1,3}|cm|mm|MPa|kN|kNm|cm²|· mento")
+# "2Ø16+1Ø12" or "1eØ6/28cm", the symbols the design system uses as field labels (M, V, c/, eØ) and units.
+NOTATION = re.compile(r"[\d.]+( cm²)?|\d+Ø\d+(\+\d+Ø\d+)*|[A-Za-zØ+×·/−]{1,3}|cm|mm|MPa|kN|kNm|cm²|· mento")
 
 
 class _Strings(HTMLParser):
@@ -155,7 +155,7 @@ def test_hero_shows_the_worked_example():
     bottom, top, shear = result["flexure"]["bottom"], result["flexure"]["top"], result["shear"]
     assert hero["bottom"] == hero["opt1"] == bottom["bars"]
     assert hero["top"] == top["bars"]
-    assert hero["stirrups"] == shear["stirrups"].replace(" cm", "").replace("/", " c/")
+    assert hero["stirrups"] == shear["stirrups"]
     assert (hero["width"], hero["height"]) == (f"{beam.EXAMPLE['width']} cm", f"{beam.EXAMPLE['height']} cm")
     assert hero["bottom_dcr"] == hero["opt1_dcr"] == f"{bottom['DCR']:.2f}"
     assert hero["top_dcr"] == f"{top['DCR']:.2f}"

@@ -70,7 +70,7 @@ export const UNITS = {
 // catalogue a bar goes back to when the page changes system.
 export const ASTM = { 3: 0.375, 4: 0.5, 5: 0.625, 6: 0.75, 7: 0.875, 8: 1, 9: 1.128, 10: 1.27, 11: 1.41, 14: 1.693 };
 const METRIC_BARS = [6, 8, 10, 12, 16, 20, 25, 32];
-// How the rebar fields name a bar and a spacing: Ø16 c/15 cm, or #5 @ 6 in.
+// How the rebar fields name a bar and a spacing: Ø16 c/15 cm, or #5 @ 6 in (the results write them Ø16c/15cm, #5@6in).
 const SYMBOLS = { si: { bar: "Ø", st: "eØ", at: "c/" }, us: { bar: "#", st: "×#", at: "@" } };
 // A length as a label writes it: 20, 7.5, never 7.500000001.
 export const fmt = (value) => String(Number(Number(value).toFixed(2)));
