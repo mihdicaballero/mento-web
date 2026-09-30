@@ -15,26 +15,7 @@ from typing import Any
 
 import common
 import mento
-from mento import (
-    Concrete_ACI_318_19,
-    Concrete_CIRSOC_201_25,
-    Concrete_EN_1992_2004,
-    Forces,
-    MPa,
-    Node,
-    RectangularBeam,
-    SteelBar,
-    cm,
-    kN,
-    kNm,
-    mm,
-)
-
-CONCRETES = {
-    "ACI 318-19": Concrete_ACI_318_19,
-    "CIRSOC 201-25": Concrete_CIRSOC_201_25,
-    "EN 1992-2004": Concrete_EN_1992_2004,
-}
+from mento import Forces, Node, RectangularBeam, ureg
 
 # The worked example every visitor opens: it must pass with every DCR between 0.7 and 0.9, and
 # the home's hero shows its result (py/test_site.py checks that the two agree).
@@ -54,30 +35,25 @@ EXAMPLE: dict[str, Any] = {
         {"label": "0.9D+1.0E", "M_y": -45, "V_z": 65, "N_x": 30},
     ],
 }
-
-
-class InputError(ValueError):
-    """A problem with what the user typed, reported back by field name."""
-
-    def __init__(self, field: str, message: str) -> None:
-        super().__init__(message)
-        self.field = field
-
-
-def _number(data: dict[str, Any], key: str, *, positive: bool = True) -> float:
-    try:
-        value = float(data.get(key))  # type: ignore[arg-type]
-    except (TypeError, ValueError):
-        raise InputError(key, "missing") from None
-    if math.isnan(value) or (positive and value <= 0):
-        raise InputError(key, "positive")
-    return value
-
-
-def _quantity(value: Any, unit: str, precision: int = 2) -> str | None:
-    if value is None:
-        return None
-    return f"{value.to(unit):.{precision}f~P}"
+# The same beam for the US: inches, psi, Grade 60 and kip-ft, under ACI 318-19. Held to the same
+# rule: it passes, with the bottom flexure governing between 0.7 and 0.9.
+EXAMPLE_US: dict[str, Any] = {
+    "code": "ACI 318-19",
+    "units": "us",
+    "lang": "en",
+    "mode": "design",
+    "label": "B-101",
+    "fc": 4000,
+    "fy": 60,
+    "width": 12,
+    "height": 24,
+    "cover": 1.5,
+    "forces": [
+        {"label": "1.4D", "M_y": 45, "V_z": 20, "N_x": 0},
+        {"label": "1.2D+1.6L", "M_y": 72, "V_z": 30, "N_x": 0},
+        {"label": "0.9D+1.0E", "M_y": -58, "V_z": 26, "N_x": 7},
+    ],
+}
 
 
 def _covers(provided: Any, required: Any) -> bool:
@@ -88,40 +64,21 @@ def _covers(provided: Any, required: Any) -> bool:
 
 
 def _build_beam(data: dict[str, Any]) -> RectangularBeam:
-    code = data.get("code")
-    if code not in CONCRETES:
-        raise InputError("code", "unknown")
-    f_c = _number(data, "fc")
-    f_y = _number(data, "fy")
-    concrete = CONCRETES[code](name=f"f'c {f_c:g}", f_c=f_c * MPa)
-    steel = SteelBar(name=f"fy {f_y:g}", f_y=f_y * MPa)
+    concrete, steel = common.materials(data)
+    units = common.units_of(data)
     return RectangularBeam(
-        label=str(data.get("label") or "B1"),
+        label=common.label_of(data, "B1"),
         concrete=concrete,
         steel_bar=steel,
-        width=_number(data, "width") * cm,
-        height=_number(data, "height") * cm,
-        c_c=_number(data, "cover") * mm,
+        width=common.number(data, "width") * ureg(units.length),
+        height=common.number(data, "height") * ureg(units.length),
+        c_c=common.number(data, "cover") * ureg(units.cover),
     )
 
 
-def _build_forces(data: dict[str, Any]) -> list[Forces]:
-    forces = []
-    for i, row in enumerate(data.get("forces") or []):
-        m_y = float(row.get("M_y") or 0)
-        v_z = float(row.get("V_z") or 0)
-        n_x = float(row.get("N_x") or 0)
-        if m_y == 0 and v_z == 0 and n_x == 0:
-            continue
-        label = str(row.get("label") or f"C{i + 1}")
-        forces.append(Forces(label=label, M_y=m_y * kNm, V_z=v_z * kN, N_x=n_x * kN))
-    if not forces:
-        raise InputError("forces", "empty")
-    return forces
-
-
 def _rows(layout: dict[str, Any]) -> list[list[tuple[int, float]]]:
-    """The bar groups of one face as rows, nearest the face first: ``(n, d in cm)`` pairs.
+    """The bar groups of one face as rows, nearest the face first: ``(n, d)`` pairs, ``d`` as the
+    layout names the bar (its diameter in mm, or its ASTM size).
 
     A layout names the row of every group, as mento's setters do: n1 and n2 are the corner and
     the inner bars of the first row, n3 and n4 those of the second.
@@ -129,7 +86,7 @@ def _rows(layout: dict[str, Any]) -> list[list[tuple[int, float]]]:
     rows = []
     for first, second in ((1, 2), (3, 4)):
         row = [
-            (int(layout[f"n{index}"]), float(layout[f"d{index}"]) / 10)
+            (int(layout[f"n{index}"]), float(layout[f"d{index}"]))
             for index in (first, second)
             if layout.get(f"n{index}") and layout.get(f"d{index}")
         ]
@@ -138,16 +95,16 @@ def _rows(layout: dict[str, Any]) -> list[list[tuple[int, float]]]:
     return rows
 
 
-def _section(beam: RectangularBeam, layouts: dict[str, Any]) -> dict[str, Any]:
-    """Section geometry in cm, origin at the bottom left corner, for the page to draw, with a
-    label for every row of bars at that row's height."""
-    width = float(beam.width.to("cm").magnitude)
-    height = float(beam.height.to("cm").magnitude)
-    cover = float(beam.c_c.to("cm").magnitude)
+def _section(beam: RectangularBeam, layouts: dict[str, Any], units: common.Units) -> dict[str, Any]:
+    """Section geometry in cm (or in), origin at the bottom left corner, for the page to draw,
+    with a label for every row of bars at that row's height."""
+    width = float(beam.width.to(units.length).magnitude)
+    height = float(beam.height.to(units.length).magnitude)
+    cover = float(beam.c_c.to(units.length).magnitude)
     transverse = beam.reinforcement.transverse
-    stirrup = float(transverse.d_b.to("cm").magnitude) if transverse.n_stirrups else 0.0
+    stirrup = float(transverse.d_b.to(units.length).magnitude) if transverse.n_stirrups else 0.0
     edge = cover + stirrup
-    row_gap = float(beam.settings.layers_spacing.to("cm").magnitude)
+    row_gap = float(beam.settings.layers_spacing.to(units.length).magnitude)
     bend = 0.43 * stirrup
 
     bars: list[dict[str, float]] = []
@@ -156,12 +113,13 @@ def _section(beam: RectangularBeam, layouts: dict[str, Any]) -> dict[str, Any]:
     def place(layout: dict[str, Any], bottom: bool) -> None:
         offset = edge
         for row in _rows(layout):
-            tallest = max(d for _, d in row)
+            tallest = max(units.size(d) for _, d in row)
             centre = offset + tallest / 2
             labels["bot" if bottom else "top"].append(
-                {"y": round(centre if bottom else height - centre, 3), "bars": _group_bars(row)}
+                {"y": round(centre if bottom else height - centre, 3), "bars": _group_bars(row, units)}
             )
-            for position, (n, d) in enumerate(row):
+            for position, (n, bar) in enumerate(row):
+                d = units.size(bar)
                 y = offset + d / 2 if bottom else height - offset - d / 2
                 span = width - 2 * edge - d
                 for i in range(n):
@@ -183,18 +141,19 @@ def _section(beam: RectangularBeam, layouts: dict[str, Any]) -> dict[str, Any]:
         "width": width,
         "height": height,
         "cover": cover,
+        "unit": units.labels["length"],
         "stirrups": {"n": int(transverse.n_stirrups or 0), "d": stirrup},
         "bars": bars,
         "labels": labels,
     }
 
 
-def _group_bars(row: list[tuple[int, float]]) -> str:
-    """``2Ø16 + 1Ø12`` for one row: bars of one diameter counted together."""
+def _group_bars(row: list[tuple[int, float]], units: common.Units) -> str:
+    """``2Ø16+1Ø12`` (``2#5+1#4``) for one row: bars of one size counted together."""
     counts: dict[float, int] = {}
     for n, d in row:
-        counts[d * 10] = counts.get(d * 10, 0) + n
-    return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
+        counts[d] = counts.get(d, 0) + n
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
 def _cell(value: Any) -> str:
@@ -221,27 +180,27 @@ def _table(frame: Any) -> dict[str, Any]:
     }
 
 
-def _bars(layers: Any) -> str:
-    """``3Ø16 + 2Ø12``: bars of one diameter are counted together, the way they are ordered on site."""
+def _bars(layers: Any, units: common.Units) -> str:
+    """``3Ø16+2Ø12``: bars of one size are counted together, the way they are ordered on site."""
     counts: dict[float, int] = {}
     for layer in layers:
-        diameter = float(layer.d_b.to("mm").magnitude)
-        counts[diameter] = counts.get(diameter, 0) + layer.n
-    return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
+        d = units.bar_of(layer.d_b)
+        counts[d] = counts.get(d, 0) + layer.n
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
-def _face(face: Any) -> dict[str, Any]:
+def _face(face: Any, units: common.Units) -> dict[str, Any]:
     """One face as mento judges it. ``A_s_min_eff`` is the minimum the face has to meet: under
     ACI 318-19 and CIRSOC 201-25 the 4/3 of §9.6.1.3 can leave it below ``A_s_min``. ``complies``
     is the verdict: a DCR of at most 1 and, under those codes, a tension-controlled section."""
     return {
-        "bars": _bars(face.layers),
-        "A_s": _quantity(face.A_s, "cm**2"),
-        "A_s_req": _quantity(face.A_s_req, "cm**2"),
-        "A_s_min": _quantity(face.A_s_min, "cm**2"),
-        "A_s_min_eff": _quantity(face.A_s_min_eff, "cm**2"),
-        "A_s_max": _quantity(face.A_s_max, "cm**2"),
-        "M_capacity": _quantity(face.M_capacity, "kN*m", 1),
+        "bars": _bars(face.layers, units),
+        "A_s": units.show(face.A_s, "area"),
+        "A_s_req": units.show(face.A_s_req, "area"),
+        "A_s_min": units.show(face.A_s_min, "area"),
+        "A_s_min_eff": units.show(face.A_s_min_eff, "area"),
+        "A_s_max": units.show(face.A_s_max, "area"),
+        "M_capacity": units.show(face.M_capacity, "moment", 1),
         "DCR": round(float(face.DCR), 3),
         "complies": bool(face.complies),
     }
@@ -249,7 +208,8 @@ def _face(face: Any) -> dict[str, Any]:
 
 # ------------------------------------------------------------------ rebar layouts
 # A layout is what the page, the URL and mento's setters all speak: {"n1": 2, "d1": 16, ...}
-# for a face and {"n": 1, "d": 6, "s": 13} for the stirrups. Diameters in mm, spacing in cm.
+# for a face and {"n": 1, "d": 6, "s": 13} for the stirrups. Diameters in mm and spacing in cm, or
+# ASTM sizes and spacing in inches ({"n1": 2, "d1": 6, ...} is 2#6).
 
 
 _FIT_CODES = ("clear_spacing_below_min", "bars_do_not_fit")
@@ -260,8 +220,11 @@ def _fits_one_row(data: dict[str, Any], stirrups: dict[str, Any], face: str, lay
     spacing: on a fresh beam with the stirrups the design finished with, read off its warnings
     (the bar spacing needs no check)."""
     probe = _build_beam(data)
+    units = common.units_of(data)
     if stirrups:
-        probe.set_transverse_rebar(n_stirrups=int(stirrups["n"]), d_b=stirrups["d"] * mm, s_l=stirrups["s"] * cm)
+        probe.set_transverse_rebar(
+            n_stirrups=int(stirrups["n"]), d_b=units.bar(stirrups["d"]), s_l=stirrups["s"] * ureg(units.length)
+        )
     first, second = layers
     setter = probe.set_longitudinal_rebar_bot if face == "bot" else probe.set_longitudinal_rebar_top
     setter(n1=int(first.n), d_b1=first.d_b, n2=int(second.n), d_b2=second.d_b)
@@ -282,21 +245,18 @@ def _layers_layout(data: dict[str, Any], stirrups: dict[str, Any], face: str, la
     slots = (1, 2, 3, 4)
     if len(layers) in (2, 3) and not _fits_one_row(data, stirrups, face, layers[:2]):
         slots = (1, 3, 4)
+    units = common.units_of(data)
     layout: dict[str, Any] = {}
     for slot, layer in zip(slots, layers, strict=False):
         layout[f"n{slot}"] = int(layer.n)
-        layout[f"d{slot}"] = round(float(layer.d_b.to("mm").magnitude), 3)
+        layout[f"d{slot}"] = units.bar_of(layer.d_b)
     return layout
 
 
-def _stirrup_layout(transverse: Any) -> dict[str, Any]:
-    if not transverse.n_stirrups:
+def _stirrup_layout(n: Any, d_b: Any, s_l: Any, units: common.Units) -> dict[str, Any]:
+    if not n:
         return {}
-    return {
-        "n": int(transverse.n_stirrups),
-        "d": round(float(transverse.d_b.to("mm").magnitude), 3),
-        "s": round(float(transverse.s_l.to("cm").magnitude), 3),
-    }
+    return {"n": int(n), "d": units.bar_of(d_b), "s": round(float(s_l.to(units.length).magnitude), 3)}
 
 
 def _rebar_layouts(rebar: dict[str, Any]) -> dict[str, Any]:
@@ -314,7 +274,7 @@ def _rebar_layouts(rebar: dict[str, Any]) -> dict[str, Any]:
 
     bottom = face(rebar.get("bot") or {})
     if not bottom:
-        raise InputError("rebar", "bottom")
+        raise common.InputError("rebar", "bottom")
     stirrups = rebar.get("stirrups") or {}
     n = int(stirrups.get("n") or 0)
     return {
@@ -331,44 +291,50 @@ def _signature(layout: dict[str, Any]) -> str:
     return "+".join(f"{layout[f'n{i}']:g}x{layout[f'd{i}']:g}" for i in range(1, 5) if layout.get(f"n{i}"))
 
 
-def _layout_bars(layout: dict[str, Any]) -> str:
+def _layout_bars(layout: dict[str, Any], units: common.Units) -> str:
+    """``3Ø16+1Ø12`` and ``1eØ6/13cm``; ``3#5+1#4`` and ``#3@5in`` (``2×#3@5in``)."""
     if not layout:
         return ""
     if "n" in layout:
-        return f"{layout['n']:g}eØ{layout['d']:g}/{layout['s']:g} cm"
+        if units.us:
+            count = "" if layout["n"] == 1 else f"{layout['n']:g}×"
+            return f"{count}{units.bar_name(layout['d'])}@{layout['s']:g}in"
+        return f"{layout['n']:g}e{units.bar_name(layout['d'])}/{layout['s']:g}cm"
     counts: dict[float, int] = {}
     for index in range(1, 5):
         n = int(layout.get(f"n{index}") or 0)
         if n:
             counts[layout[f"d{index}"]] = counts.get(layout[f"d{index}"], 0) + n
-    return " + ".join(f"{n}Ø{diameter:g}" for diameter, n in counts.items())
+    return "+".join(f"{n}{units.bar_name(d)}" for d, n in counts.items())
 
 
-def _layout_rows(layout: dict[str, Any]) -> list[str]:
-    """The bars of a face, one string per row: ``["2Ø16 + 1Ø12", "2Ø12"]``."""
+def _layout_rows(layout: dict[str, Any], units: common.Units) -> list[str]:
+    """The bars of a face, one string per row: ``["2Ø16+1Ø12", "2Ø12"]``."""
     if not layout or "n" in layout:
-        return [_layout_bars(layout)] if layout else []
-    return [_group_bars(row) for row in _rows(layout)]
+        return [_layout_bars(layout, units)] if layout else []
+    return [_group_bars(row, units) for row in _rows(layout)]
 
 
-def _layout_area(layout: dict[str, Any]) -> str:
-    """The steel a layout puts in: cm² on a face, cm²/m of stirrups."""
+def _layout_area(layout: dict[str, Any], units: common.Units) -> str:
+    """The steel a layout puts in: cm² (in²) on a face, cm²/m (in²/ft) of stirrups."""
     if not layout:
         return ""
     if "n" in layout:
-        legs = 2 * layout["n"] * math.pi * layout["d"] ** 2 / 4  # mm² per stirrup line
-        return f"{legs / 100 / (layout['s'] / 100):.2f} cm²/m"
-    total = sum(int(layout.get(f"n{i}") or 0) * math.pi * float(layout.get(f"d{i}") or 0) ** 2 / 4 for i in range(1, 5))
-    return f"{total / 100:.2f} cm²"
+        legs = 2 * layout["n"] * units.bar_area(layout["d"])  # per stirrup line
+        return f"{legs * units.run / layout['s']:.2f} {units.labels['per_length']}"
+    total = sum(
+        int(layout.get(f"n{i}") or 0) * units.bar_area(layout[f"d{i}"]) for i in range(1, 5) if layout.get(f"n{i}")
+    )
+    return f"{total:.2f} {units.labels['area']}"
 
 
-def _apply_layouts(beam: RectangularBeam, layouts: dict[str, Any]) -> None:
+def _apply_layouts(beam: RectangularBeam, layouts: dict[str, Any], units: common.Units) -> None:
     def kwargs(layout: dict[str, Any]) -> dict[str, Any]:
         out: dict[str, Any] = {}
         for index in range(1, 5):
             n = int(layout.get(f"n{index}") or 0)
             out[f"n{index}"] = n
-            out[f"d_b{index}"] = layout[f"d{index}"] * mm if n else None
+            out[f"d_b{index}"] = units.bar(layout[f"d{index}"]) if n else None
         return out
 
     beam.set_longitudinal_rebar_bot(**kwargs(layouts.get("bot") or {}))
@@ -376,7 +342,9 @@ def _apply_layouts(beam: RectangularBeam, layouts: dict[str, Any]) -> None:
         beam.set_longitudinal_rebar_top(**kwargs(layouts["top"]))
     stirrups = layouts.get("st") or {}
     if stirrups.get("n"):
-        beam.set_transverse_rebar(n_stirrups=int(stirrups["n"]), d_b=stirrups["d"] * mm, s_l=stirrups["s"] * cm)
+        beam.set_transverse_rebar(
+            n_stirrups=int(stirrups["n"]), d_b=units.bar(stirrups["d"]), s_l=stirrups["s"] * ureg(units.length)
+        )
 
 
 # ----------------------------------------------------------------- design options
@@ -387,7 +355,7 @@ def _checked(data: dict[str, Any], forces: list[Forces], layouts: dict[str, Any]
     state behind: the same design run twice on one beam does not give the same stirrups."""
     beam = _build_beam(data)
     node = Node(section=beam, forces=forces)
-    _apply_layouts(beam, layouts)
+    _apply_layouts(beam, layouts, common.units_of(data))
     node.check()
     return beam, node
 
@@ -412,14 +380,11 @@ def _options(data: dict[str, Any], beam: RectangularBeam) -> dict[str, list[dict
     ``options[0]`` is what the design applied; the rest are alternatives mento built on the
     finished section and kept only if it passes with them, so there may be fewer than asked for.
     """
+    units = common.units_of(data)
+    transverse = beam.reinforcement.transverse
     stirrups = [
-        {
-            "n": int(option.n_stirrups),
-            "d": round(float(option.d_b.to("mm").magnitude), 3),
-            "s": round(float(option.s_l.to("cm").magnitude), 3),
-        }
-        for option in beam.shear_design.options
-    ] or [_stirrup_layout(beam.reinforcement.transverse)]
+        _stirrup_layout(option.n_stirrups, option.d_b, option.s_l, units) for option in beam.shear_design.options
+    ] or [_stirrup_layout(transverse.n_stirrups, transverse.d_b, transverse.s_l, units)]
     flexure = beam.flexure_design
     candidates = {
         group: [_layers_layout(data, stirrups[0], group, option.layers) for option in face.options]
@@ -437,9 +402,9 @@ def _options(data: dict[str, Any], beam: RectangularBeam) -> dict[str, list[dict
             seen.add(_signature(layout))
             options[group].append(
                 {
-                    "bars": _layout_bars(layout),
-                    "rows": _layout_rows(layout),
-                    "area": _layout_area(layout),
+                    "bars": _layout_bars(layout, units),
+                    "rows": _layout_rows(layout, units),
+                    "area": _layout_area(layout, units),
                     "signature": _signature(layout),
                     "layout": layout,
                 }
@@ -491,7 +456,8 @@ def _select(options: dict[str, Any], choice: dict[str, Any]) -> tuple[dict[str, 
 def _solve(data: dict[str, Any]) -> dict[str, Any]:
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
-    forces = _build_forces(data)
+    forces = common.build_forces(data)
+    units = common.units_of(data)
     check_mode = data.get("mode") == "check"
     options: dict[str, Any] = {}
     selected: dict[str, int] = {}
@@ -523,26 +489,30 @@ def _solve(data: dict[str, Any]) -> dict[str, Any]:
         "ok": True,
         "version": mento.__version__,
         "code": data["code"],
-        "rebar": {group: _layout_bars(layout) for group, layout in layouts.items()},
-        "rows": {group: _layout_rows(layout) for group, layout in layouts.items()},
+        "units": units.name,
+        "rebar": {group: _layout_bars(layout, units) for group, layout in layouts.items()},
+        "rows": {group: _layout_rows(layout, units) for group, layout in layouts.items()},
         "layouts": layouts,
         "options": options,
         "selected": selected,
         "changed": changed,
         "complies": bool(flexure.complies) and shear.DCR <= 1,
-        "ledger": [*common.flexure_rows(beam, forces, data["code"]), common.shear_row(beam, forces, data["code"])],
+        "ledger": [
+            *common.flexure_rows(beam, forces, data["code"], units),
+            common.shear_row(beam, forces, data["code"], units),
+        ],
         "notices": common.warning_notices(node, list(captured)),
-        "flexure": {"bottom": _face(flexure.bottom), "top": _face(flexure.top)},
+        "flexure": {"bottom": _face(flexure.bottom, units), "top": _face(flexure.top, units)},
         "shear": {
-            "stirrups": _layout_bars(layouts.get("st") or {}),
-            "A_v": _quantity(shear.A_v, "cm**2/m"),
-            "A_v_req": _quantity(getattr(shear, "A_v_req", None), "cm**2/m"),
-            "V_capacity": _quantity(getattr(shear, "V_capacity", None), "kN", 1),
+            "stirrups": _layout_bars(layouts.get("st") or {}, units),
+            "A_v": units.show(shear.A_v, "per_length"),
+            "A_v_req": units.show(getattr(shear, "A_v_req", None), "per_length"),
+            "V_capacity": units.show(getattr(shear, "V_capacity", None), "force", 1),
             "DCR": round(float(shear.DCR), 3),
             "enough": _covers(shear.A_v, getattr(shear, "A_v_req", None)),
         },
         "tables": {"flexure": _table(flexure_table), "shear": _table(shear_table)},
-        "section": _section(beam, layouts),
+        "section": _section(beam, layouts, units),
         **detailed,
     }
 
@@ -551,7 +521,7 @@ def run(payload: str) -> str:
     """Design or check a beam. Never raises: errors come back as ``{"ok": false}``."""
     try:
         result = _solve(json.loads(payload))
-    except InputError as error:
+    except common.InputError as error:
         result = {"ok": False, "kind": "input", "field": error.field, "message": str(error)}
     except Exception as error:  # noqa: BLE001 - everything must reach the page as JSON
         result = {"ok": False, "kind": "mento", "message": f"{type(error).__name__}: {error}"}
@@ -563,8 +533,8 @@ def report(payload: str) -> str:
     data = json.loads(payload)
     lang = data.get("lang", "en")
     mento.set_language(lang if lang in mento.available_languages() else "en")
-    data["label"] = common.safe_label(str(data.get("label") or "B1"))
-    forces = _build_forces(data)
+    data["label"] = common.safe_label(common.label_of(data, "B1"))
+    forces = common.build_forces(data)
     if data.get("mode") == "check":
         layouts = _rebar_layouts(data.get("rebar") or {})
     else:

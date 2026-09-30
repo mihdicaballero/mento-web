@@ -77,7 +77,7 @@ def test_check_mode_takes_a_second_row_on_each_face():
     }
     result = solve(mode="check", rebar=rebar, width=20, height=40)
     assert result["layouts"]["bot"] == {"n1": 3, "d1": 20.0, "n3": 2, "d3": 16.0}
-    assert result["rows"] == {"bot": ["3Ø20", "2Ø16"], "top": ["2Ø12", "2Ø10"], "st": ["1eØ8/15 cm"]}
+    assert result["rows"] == {"bot": ["3Ø20", "2Ø16"], "top": ["2Ø12", "2Ø10"], "st": ["1eØ8/15cm"]}
     first, second = (label["y"] for label in result["section"]["labels"]["bot"])
     assert second - first > 2  # the second row sits a bar and a row gap above the first
 
@@ -231,11 +231,11 @@ def test_a_face_without_demand_has_no_dcr():
 
 
 def test_the_minimum_is_the_effective_one():
-    """The example's top face, 2Ø12 + 1Ø10 under Mu = -45 kNm, is below A_s,min but above the
+    """The example's top face, 2Ø12+1Ø10 under Mu = -45 kNm, is below A_s,min but above the
     A_s,min,eff the 4/3 of CIRSOC 201-25 §9.6.1.3 leaves: no warning, and it complies."""
     result = solve()
     top = result["flexure"]["top"]
-    assert top["bars"] == "2Ø12 + 1Ø10"
+    assert top["bars"] == "2Ø12+1Ø10"
     area = float(top["A_s"].split()[0])
     assert float(top["A_s_min_eff"].split()[0]) <= area < float(top["A_s_min"].split()[0])
     assert top["complies"] and result["notices"] == []
@@ -291,7 +291,7 @@ def test_check_mode_has_no_options():
     rebar = {"bot": {"n1": 3, "d1": 16}, "top": {"n1": 2, "d1": 12}, "stirrups": {"n": 1, "d": 6, "s": 13}}
     result = solve(mode="check", rebar=rebar)
     assert result["options"] == {} and result["selected"] == {}
-    assert result["rebar"] == {"bot": "3Ø16", "top": "2Ø12", "st": "1eØ6/13 cm"}
+    assert result["rebar"] == {"bot": "3Ø16", "top": "2Ø12", "st": "1eØ6/13cm"}
 
 
 def test_report_joins_flexure_and_shear_without_a_blank_page():

@@ -1,6 +1,79 @@
 // Home: its movement, language, the test count CI publishes, and a head start on the calculator.
-import { applyStrings, loadStrings, preferredLang, rememberLang } from "./shared/i18n.js";
+import { LANGS, applyStrings, loadStrings, preferredLang, rememberLang } from "./shared/i18n.js";
 import { calm, radiogroup, tween } from "./shared/ui.js";
+
+// ------------------------------------------------------------ the hero in US units
+// The markup is the metric example. The page in English shows beam/'s US example instead (the JSON
+// under the hero, which py/test_site.py checks against mento): the home has no units switch, its
+// units are its language's (the calculators keep their own). Drawn in the same frame: the section's
+// height takes the 300 px the metric one does, and everything else scales with it. First thing, like
+// the movement below, so the metric hero never shows in English and then changes.
+const hero = document.getElementById("hero");
+const card = document.querySelector(".ccard--featured .fig svg");
+const HERO_SI = { hero: hero.innerHTML, top: hero.dataset.top, st: hero.dataset.st, card: card.innerHTML };
+const HERO_US = JSON.parse(document.getElementById("hero-us").textContent);
+const unitsOf = (language) => (language === "en" ? "us" : "si");
+// A shared link names its language (?l=en), over the visitor's own: the address keeps the one on
+// screen, so the link copied from it opens as it was seen. Not a #: the home's anchors use it.
+const linkedLang = new URLSearchParams(location.search).get("l");
+const firstLang = LANGS.includes(linkedLang) ? linkedLang : preferredLang();
+let units = unitsOf(firstLang);
+
+function beamDrawing(data, hooks) {
+  const scale = 300 / data.height;
+  const w = data.width * scale;
+  const cx = (x) => (x * scale).toFixed(2);
+  const cy = (y) => (300 - y * scale).toFixed(2);
+  const r = (d) => Math.max(2.5, (d / 2) * scale).toFixed(2);
+  const hook = (name) => (hooks ? ` data-hero="${name}"` : "");
+  const low = data.bars.filter(([, y]) => y < data.height / 2);
+  const high = data.bars.filter(([, y]) => y >= data.height / 2);
+  const inset = data.cover * scale;
+  const label = (y, text, name, [x1, extra] = [w - 16, ""]) => `<line x1="${x1}" y1="${y}" x2="${w + 30}" y2="${y}"`
+    + ` stroke="#5b6470" stroke-width=".8"/><text class="dw-label${extra}" x="${w + 34}" y="${Number(y) + 3.5}" font-size="14"${hook(name)}>${text}</text>`;
+  return `<rect class="dw-concrete" x="0" y="0" width="${w}" height="300"/>`
+    + `<rect class="dw-stirrup" x="${inset}" y="${inset}" width="${w - 2 * inset}" height="${300 - 2 * inset}" rx="5"`
+    + ` style="stroke-width:${(data.stirrup * scale).toFixed(1)}"/>`
+    + low.map(([x, y, d]) => `<circle class="dw-bar"${hooks ? " data-mid" : ""} cx="${cx(x)}" cy="${cy(y)}" r="${r(d)}"/>`).join("")
+    + high.map(([x, y, d]) => `<circle class="dw-bar" cx="${cx(x)}" cy="${cy(y)}" r="${r(d)}"/>`).join("")
+    + label(cy(high[0][1]), data.top, "top") + label(150, data.stirrups, "stirrups", [w - 12, " dw-label--stirrup"])
+    + label(cy(low[0][1]), data.options[0].bars, "bottom")
+    + `<path class="dw-dl" d="M0 304V318M${w} 304V318M-4 314H${w + 4}M-3 317L3 311M${w - 3} 317L${w + 3} 311"/>`
+    + `<text class="dw-dt" x="${w / 2}" y="330" text-anchor="middle"${hook("width")}>${data.width} in</text>`
+    + '<path class="dw-dl" d="M-4 0H-18M-4 300H-18M-14 -4V304M-17 3L-11 -3M-17 303L-11 297"/>'
+    + `<text class="dw-dt" x="-21" y="150" text-anchor="middle" transform="rotate(-90 -21 150)"${hook("height")}>${data.height} in</text>`;
+}
+
+// The hero and the beam's card in one system: the metric markup as it came, or the US example drawn over it.
+function showUnits(next) {
+  hero.innerHTML = HERO_SI.hero;
+  Object.assign(hero.dataset, { top: HERO_SI.top, st: HERO_SI.st });
+  delete hero.dataset.scale;
+  card.innerHTML = HERO_SI.card;
+  if (next !== "us") return;
+  const data = HERO_US;
+  Object.assign(hero.dataset, { top: data.data_top, st: data.data_st, scale: 300 / data.height });
+  // room on the right for the labels, the height's dimension line on the left
+  const left = Math.min(70, 310 - (data.width * 300) / data.height - 110);
+  for (const [svg, hooks] of [[hero.querySelector(".viz-draw svg"), true], [card, false]]) {
+    const group = svg.querySelector("g");
+    group.setAttribute("transform", `translate(${left},10)`);
+    group.innerHTML = beamDrawing(data, hooks);
+  }
+  hero.querySelectorAll(".opt").forEach((option, index) => {
+    const values = data.options[index];
+    Object.assign(option.dataset, { sig: values.sig, mid: values.low });
+    option.querySelector(".val").textContent = values.bars;
+    option.querySelector(".area").textContent = values.area;
+    option.querySelector(".dcr").textContent = values.dcr;
+  });
+  const bottom = Number(data.options[0].dcr);
+  const [top, shear] = [Number(data.top_dcr), Number(data.shear_dcr)];
+  const cells = { bottom_dcr: bottom, top_dcr: top, shear_dcr: shear, dcr: Math.max(bottom, top, shear), sum_flex: Math.max(bottom, top), sum_shear: shear };
+  for (const [name, value] of Object.entries(cells)) hero.querySelector(`[data-hero="${name}"]`).textContent = value.toFixed(2);
+  hero.querySelectorAll(".mini .meter i").forEach((meter, index) => { meter.style.width = `${Math.min([bottom, top, shear][index], 1) * 100}%`; });
+}
+if (units === "us") showUnits("us");
 
 // ------------------------------------------------------------ movement (design system v2)
 // First thing, before the dictionary loads, so nothing on screen shows and then hides again.
@@ -25,7 +98,6 @@ if (moving) {
 // Picking another of mento's options redraws its bars and moves the bottom flexure DCR, as the
 // calculator does; each option's numbers are mento's (the markup carries them, the tests check
 // them). Its link opens the beam calculator with that option loaded, to check it or change it.
-const hero = document.getElementById("hero");
 const heroCell = (name) => hero.querySelector(`[data-hero="${name}"]`);
 const fixed2 = (value) => value.toFixed(2);
 
@@ -39,7 +111,7 @@ function linkHero(option) {
   const [bottom, top] = [face(option.dataset.sig), face(hero.dataset.top)];
   const [, n, d, s] = /^(\d+)x(\d+)@(\d+)$/.exec(hero.dataset.st);
   const bars = [...bottom[0], ...bottom[1], ...top[0], ...top[1], n, d, s, ...bottom[2], ...bottom[3], ...top[2], ...top[3]];
-  const params = new URLSearchParams({ v: "1", l: lang, m: "check", r: bars.join(",") });
+  const params = new URLSearchParams({ v: "1", l: lang, u: units, m: "check", r: bars.join(",") });
   hero.querySelector("#hero-check").href = `beam/#${params}`;
 }
 
@@ -56,14 +128,15 @@ function pickOption(option, { animate = true } = {}) {
   }
   heroCell("bottom_dcr").previousElementSibling.querySelector("i").style.width = `${Math.min(bottom, 1) * 100}%`;
   heroCell("bottom").textContent = option.querySelector(".val").textContent;
-  // the corner bars are the same in every option; the ones between them are the option's
+  // the bars marked data-mid are the option's: those between the corners in the metric hero, all the
+  // bottom ones in the US hero (#6 and #5 corners); drawn at 5 px a cm (or the US scale), the bottom at y = 300
+  const scale = Number(hero.dataset.scale || 5);
   const svg = hero.querySelector(".viz-draw svg g");
   const old = svg.querySelectorAll("[data-mid]");
   const bars = option.dataset.mid.split(";").map((bar) => bar.split(",").map(Number));
   for (const [x, y, d] of bars) {
     const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-    // drawn at 5 px a cm, the section's bottom at y = 300
-    Object.entries({ class: "dw-bar", "data-mid": "", cx: x * 5, cy: 300 - y * 5, r: Math.max(2.5, (d / 2) * 5) })
+    Object.entries({ class: "dw-bar", "data-mid": "", cx: x * scale, cy: 300 - y * scale, r: Math.max(2.5, (d / 2) * scale) })
       .forEach(([name, value]) => circle.setAttribute(name, value));
     if (animate) circle.style.animationDelay = "0s";
     old[0].before(circle);
@@ -73,7 +146,8 @@ function pickOption(option, { animate = true } = {}) {
 }
 
 const pickedOption = () => hero.querySelector(".opt:has(input:checked)") || hero.querySelector(".opt");
-hero.querySelector(".viz-prop").addEventListener("change", (event) => pickOption(event.target.closest(".opt")));
+// on the hero itself: a change of units puts new options in it
+hero.addEventListener("change", (event) => { if (event.target.closest(".opt")) pickOption(event.target.closest(".opt")); });
 
 // Sections come in as they are reached, their items one after another. The attribute that hides
 // them comes off once they are in, so their own transitions (a card's hover) are theirs again.
@@ -115,14 +189,30 @@ function countWhenSeen(element, value) {
 
 // ------------------------------------------------------------ language and figures
 const strings = await loadStrings("home");
-let lang = preferredLang();
+let lang = firstLang;
+
+// The language in the address, and in the links to the calculators, which read it from their hash
+// (the hero's own link carries a whole design, and names it itself).
+function linkLang() {
+  const url = new URL(location.href);
+  url.searchParams.set("l", lang);
+  history.replaceState(null, "", url);
+  for (const link of document.querySelectorAll('a[href^="beam/"]:not(#hero-check), a[href^="slab/"], a[href^="wall/"]')) {
+    link.setAttribute("href", `${link.getAttribute("href").split("#")[0]}#l=${lang}`);
+  }
+}
+
 const langGroup = radiogroup(document.querySelector(".top .seg"), (button) => {
   lang = button.dataset.lang;
   rememberLang(lang);
-  applyStrings(strings, lang);
+  units = unitsOf(lang);
+  showUnits(units);
+  applyStrings(strings, lang, document, units);
   linkHero(pickedOption());
+  linkLang();
 });
-applyStrings(strings, lang);
+applyStrings(strings, lang, document, units);
+linkLang();
 langGroup.sync();
 // a page come back to may keep the option picked before; the markup shows the first
 if (pickedOption() !== hero.querySelector(".opt")) pickOption(pickedOption(), { animate: false });

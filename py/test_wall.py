@@ -67,7 +67,7 @@ def test_a_chosen_option_survives_a_recalculation():
 def test_check_mode_takes_the_mesh_the_user_typed():
     result = solve(mode="check", rebar={"horizontal": {"d": 10, "s": 15}, "vertical": {"d": 8, "s": 20}})
     assert result["ok"], result
-    assert result["rebar"] == {"horizontal": "Ø10 c/15 cm", "vertical": "Ø8 c/20 cm"}
+    assert result["rebar"] == {"horizontal": "Ø10c/15cm", "vertical": "Ø8c/20cm"}
     assert result["options"] == {}
 
 

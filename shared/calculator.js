@@ -1,7 +1,7 @@
 // What every calculator page does: keep the state, put it in the URL, drive the worker, and
 // paint the four stations. A page supplies a spec (its fields, its rebar groups, its drawing
 // and its Python snippet) and the markup the design system defines; everything else is here.
-import { applyStrings, loadStrings, preferredLang, rememberLang } from "./i18n.js";
+import { UNIT_WORDS, applyStrings, loadStrings, preferredLang, preferredUnits, rememberLang, rememberUnits } from "./i18n.js";
 import { calm, copy, escapeHtml, foldable, highlightPython, numberField, radiogroup, toast, tween } from "./ui.js";
 
 export const $ = (id) => document.getElementById(id);
@@ -45,8 +45,76 @@ export const MATERIALS = {
   },
 };
 const DEFAULT_MATERIALS = { "CIRSOC 201-25": [25, 420], "ACI 318-19": [25, 420], "EN 1992-2004": [25, 500] };
+// US customary: f′c in psi and the ASTM A615 grades, fy in ksi. Only ACI 318-19 is written for them.
+export const MATERIALS_US = {
+  "ACI 318-19": {
+    concrete: [3000, 4000, 5000, 6000, 8000].map((f) => [f, `f′c ${f} psi`]),
+    steel: [[40, "Grade 40 · fy 40 ksi"], [60, "Grade 60 · fy 60 ksi"], [80, "Grade 80 · fy 80 ksi"]],
+  },
+};
+const DEFAULT_MATERIALS_US = { "ACI 318-19": [4000, 60] };
+const materialsFor = (units) => (units === "us" ? MATERIALS_US : MATERIALS);
 export const CONCRETE_CLASS = {
   "ACI 318-19": "Concrete_ACI_318_19", "CIRSOC 201-25": "Concrete_CIRSOC_201_25", "EN 1992-2004": "Concrete_EN_1992_2004",
+};
+
+// ------------------------------------------------------------ unit systems
+// What a page needs to draw and write in each system. `scale` turns a drawing's px per cm into px
+// per its own unit; `cover` takes the cover field (mm or in) to the section's unit (cm or in), and
+// `toSpan` a length in that unit to the one a wall's length is typed in (cm or ft).
+export const UNITS = {
+  si: { name: "si", ...UNIT_WORDS.si, scale: 1, cover: (value) => value / 10, toSpan: (value) => value },
+  us: { name: "us", ...UNIT_WORDS.us, scale: 2.54, cover: (value) => value, toSpan: (value) => value / 12 },
+};
+// ASTM A615 bar size -> nominal diameter in inches, as mento has it (mento.bar_sizes; py/test_us.py keeps
+// the two in step): the page needs it to convert bars when it changes system, before Python answers.
+// And the metric catalogue a bar goes back to.
+export const ASTM = { 3: 0.375, 4: 0.5, 5: 0.625, 6: 0.75, 7: 0.875, 8: 1, 9: 1.128, 10: 1.27, 11: 1.41, 14: 1.693 };
+const METRIC_BARS = [6, 8, 10, 12, 16, 20, 25, 32];
+// How the rebar fields name a bar and a spacing: Ø16 c/15 cm, or #5 @ 6 in (the results write them Ø16c/15cm, #5@6in).
+const SYMBOLS = { si: { bar: "Ø", st: "eØ", at: "c/" }, us: { bar: "#", st: "×#", at: "@" } };
+// A length as a label writes it: 20, 7.5, never 7.500000001.
+export const fmt = (value) => String(Number(Number(value).toFixed(2)));
+
+// The Python snippet in the page's system: the units it imports and how it writes each quantity.
+export function pyUnits(units) {
+  if (units === "us") {
+    return {
+      imports: "from mento import psi, ksi, inch, ft, kip, bar_diameter",
+      fc: (value) => `${value} * psi`, fy: (value) => `${value} * ksi`,
+      len: (value) => `${value} * inch`, cov: (value) => `${value} * inch`, span: (value) => `${value} * ft`,
+      force: (value) => `${value} * kip`, moment: (value) => `${value} * kip * ft`,
+      bar: (size) => `bar_diameter(${size})`,
+    };
+  }
+  return {
+    imports: "from mento import MPa, cm, mm, kN, kNm",
+    fc: (value) => `${value} * MPa`, fy: (value) => `${value} * MPa`,
+    len: (value) => `${value} * cm`, cov: (value) => `${value} * mm`, span: (value) => `${value} * cm`,
+    force: (value) => `${value} * kN`, moment: (value) => `${value} * kNm`,
+    bar: (diameter) => `${diameter} * mm`,
+  };
+}
+
+// Changing system keeps what was typed, converted and rounded to what a drawing in that system
+// would say (20 cm is 8 in, 25 mm of cover 1 in). Each kind converts [to US, to SI].
+const step = (value, size) => (value > 0 ? Math.max(size, Number((Math.round(value / size) * size).toFixed(2))) : value);
+const nearest = (options, value) => options.reduce((a, b) => (Math.abs(b - value) < Math.abs(a - value) ? b : a));
+const barMm = (size) => (ASTM[size] ?? size / 8) * 25.4;
+const CONVERT = {
+  len: [(v) => step(v / 2.54, 1), (v) => step(v * 2.54, 5)],
+  spacing: [(v) => step(v / 2.54, 1), (v) => step(v * 2.54, 1)],
+  cov: [(v) => step(v / 25.4, 0.25), (v) => step(v * 25.4, 5)],
+  span: [(v) => step(v / 30.48, 0.5), (v) => step(v * 30.48, 10)],
+  // a slab is designed per metre or per foot: a metre strip becomes a foot strip, and back
+  strip: [(v) => (v === 100 ? 12 : step(v / 2.54, 1)), (v) => (v === 12 ? 100 : step(v * 2.54, 1))],
+  force: [(v) => Math.round(v * 0.224809 * 10) / 10, (v) => Math.round(v * 4.44822 * 10) / 10],
+  moment: [(v) => Math.round(v * 0.737562 * 10) / 10, (v) => Math.round(v * 1.35582 * 10) / 10],
+  // the nearest bar of the other catalogue, by diameter
+  bar: [
+    (d) => (d ? Number(Object.keys(ASTM).reduce((a, b) => (Math.abs(barMm(b) - d) < Math.abs(barMm(a) - d) ? b : a))) : 0),
+    (size) => (size ? nearest(METRIC_BARS, barMm(size)) : 0),
+  ],
 };
 
 const HASH_VERSION = "1";
@@ -145,8 +213,11 @@ export async function start(spec) {
     try {
       const params = new URLSearchParams(location.hash.slice(1));
       if (params.get("v") !== HASH_VERSION) return null;
-      const next = structuredClone(spec.example);
+      // a link from before the units carries none: it was metric
+      const units = params.get("u") === "us" ? "us" : "si";
+      const next = exampleFor(units);
       next.code = params.get("c") || next.code;
+      if (!materialsFor(units)[next.code]) next.code = exampleFor(units).code;
       next.fc = Number(params.get("fc")) || next.fc;
       next.fy = Number(params.get("fy")) || next.fy;
       next.label = params.get("lb") ?? next.label;
@@ -177,7 +248,7 @@ export async function start(spec) {
 
   function writeHash() {
     const params = new URLSearchParams({
-      v: HASH_VERSION, l: lang, c: state.code, fc: state.fc, fy: state.fy, lb: state.label, m: state.mode,
+      v: HASH_VERSION, l: lang, u: state.units, c: state.code, fc: state.fc, fy: state.fy, lb: state.label, m: state.mode,
       d: spec.numbers.map((field) => state[field.id]).join(","),
       f: state.forces.map((force) => [force.label, ...spec.forces.map((key) => force[key] ?? 0)].join(",")).join(";"),
       r: barIds.map((id) => { const [group, key] = spec.bars[id]; return state.rebar[group][key] || 0; }).join(","),
@@ -186,10 +257,16 @@ export async function start(spec) {
     history.replaceState(null, "", `${location.pathname}#${params}`);
   }
 
-  const state = readHash() || structuredClone(spec.example);
+  function exampleFor(units) {
+    return { units, ...structuredClone(units === "us" ? spec.exampleUS : spec.example) };
+  }
+
+  const state = readHash() || exampleFor(preferredUnits());
   let lang = new URLSearchParams(location.hash.slice(1)).get("l") || preferredLang();
   let t = strings[lang] || strings.es;
   let lastResult = null;
+  // the metric code to go back to, if the visitor tries US units and returns
+  let metricCode = state.units === "si" ? state.code : null;
 
   // ------------------------------------------------------------ worker (5.1)
   // A worker script comes from the HTTP cache like any file, and nothing else revalidates it:
@@ -325,7 +402,7 @@ export async function start(spec) {
   function payload() {
     const numbers = Object.fromEntries(spec.numbers.map((field) => [field.id, num(state[field.id])]));
     return {
-      code: state.code, lang, mode: state.mode, label: state.label, fc: state.fc, fy: state.fy, ...numbers,
+      code: state.code, units: state.units, lang, mode: state.mode, label: state.label, fc: state.fc, fy: state.fy, ...numbers,
       forces: state.forces.map((force) => Object.fromEntries([
         ["label", force.label], ...spec.forces.map((key) => [key, num(force[key])]),
       ])),
@@ -342,7 +419,7 @@ export async function start(spec) {
       let message = "";
       if (String(state[field.id]).trim() === "" || Number.isNaN(value)) message = t.err_number;
       else if (value <= 0) message = t.err_positive;
-      else if (field.rule) message = t[field.rule(state, num)] || "";
+      else if (field.rule) message = t[field.rule(state, num, UNITS[state.units])] || "";
       setFieldError(field.id, message);
       ok = ok && !message;
     }
@@ -476,7 +553,7 @@ export async function start(spec) {
     const drawn = new Set([...$("drawing").querySelectorAll(".dw-bar")].map(barKey));
     const previewed = $("drawing").dataset.preview === "1";  // the section was up, its bars were not
     delete $("drawing").dataset.preview;
-    $("drawing").innerHTML = spec.drawing(result, t, window.matchMedia("(max-width: 720px)").matches);
+    $("drawing").innerHTML = spec.drawing(result, t, window.matchMedia("(max-width: 720px)").matches, UNITS[result.units || "si"]);
     if ((drawn.size || previewed) && !calm()) {
       [...$("drawing").querySelectorAll(".dw-bar")].filter((bar) => !drawn.has(barKey(bar)))
         .forEach((bar, index) => { bar.classList.add("dw-new"); bar.style.animationDelay = `${index * 45}ms`; });
@@ -495,10 +572,10 @@ export async function start(spec) {
   // result tables hold shimmering placeholders of their shape.
   function renderPreview() {
     if (lastResult || !spec.preview) return;
-    const draft = spec.preview(state);
+    const draft = spec.preview(state, UNITS[state.units]);
     const sizes = Object.values(draft.section).filter((value) => typeof value === "number");
     if (!sizes.every((value) => Number.isFinite(value) && value >= 0)) return;
-    $("drawing").innerHTML = spec.drawing(draft, t, window.matchMedia("(max-width: 720px)").matches);
+    $("drawing").innerHTML = spec.drawing(draft, t, window.matchMedia("(max-width: 720px)").matches, UNITS[state.units]);
     $("drawing").dataset.preview = "1";
   }
 
@@ -651,8 +728,81 @@ export async function start(spec) {
   }
 
   function renderMaterials() {
-    fillSelect($("fc"), MATERIALS[state.code].concrete, state.fc);
-    fillSelect($("fy"), MATERIALS[state.code].steel, state.fy);
+    const materials = materialsFor(state.units)[state.code];
+    fillSelect($("fc"), materials.concrete, state.fc);
+    fillSelect($("fy"), materials.steel, state.fy);
+  }
+
+  function renderCodes() {
+    const codes = Object.keys(materialsFor(state.units));
+    fillSelect($("code"), codes.map((code) => [code, code === "EN 1992-2004" ? "EN 1992" : code]), state.code);
+  }
+
+  // Every unit the markup names ([data-unit]: cm, kNm...), and the rebar fields' symbols
+  // ([data-sym]: Ø / #, c/ / @), in the page's system.
+  function renderUnits() {
+    document.querySelectorAll("[data-unit]").forEach((element) => { element.textContent = UNIT_WORDS[state.units][element.dataset.unit]; });
+    document.querySelectorAll("[data-sym]").forEach((element) => { element.textContent = SYMBOLS[state.units][element.dataset.sym]; });
+    document.querySelectorAll("#units [data-units]")
+      .forEach((button) => button.setAttribute("aria-checked", String(button.dataset.units === state.units)));
+    $("units-note").hidden = state.units !== "us";
+  }
+
+  // What was typed, in the other system: converted and rounded, the materials to the nearest grade
+  // that system lists. A US design is to ACI 318-19; going back restores the metric code it left.
+  function convertState(next) {
+    const way = next === "us" ? 0 : 1;
+    const by = (kind, value) => {
+      const number = num(value);
+      return Number.isFinite(number) && String(value).trim() !== "" ? CONVERT[kind][way](number) : value;
+    };
+    const fc = next === "us" ? num(state.fc) * 145.038 : num(state.fc) / 145.038;
+    const fy = next === "us" ? num(state.fy) / 6.89476 : num(state.fy) * 6.89476;
+    if (next === "us") metricCode = state.code;
+    state.code = next === "us" ? "ACI 318-19" : metricCode || state.code;
+    const materials = materialsFor(next)[state.code];
+    state.fc = nearest(materials.concrete.map(([value]) => value), fc);
+    state.fy = nearest(materials.steel.map(([value]) => value), fy);
+    for (const field of spec.numbers) state[field.id] = by(field.unit, state[field.id]);
+    for (const force of state.forces) {
+      for (const key of spec.forces) force[key] = by(key === "M_y" ? "moment" : "force", force[key]);
+    }
+    for (const [group, key] of Object.values(spec.bars)) {
+      if (key.startsWith("d")) state.rebar[group][key] = CONVERT.bar[way](num(state.rebar[group][key]));
+      else if (key === "s") state.rebar[group][key] = by("spacing", state.rebar[group][key]);
+    }
+    state.choice = {};
+  }
+
+  // Converting twice is not the identity (H-25 is 4000 psi, and 4000 psi the nearer of H-25 and
+  // H-30 to 27.6 MPa is H-30): going back to the other system with nothing edited in between gives
+  // back exactly what was there.
+  let unitsUndo = null;
+
+  function setUnits(next) {
+    if (next === state.units) return;
+    const before = structuredClone(state);
+    if (unitsUndo?.units === next && unitsUndo.produced === JSON.stringify(state)) {
+      for (const key of Object.keys(state)) delete state[key];
+      Object.assign(state, structuredClone(unitsUndo.state));
+      metricCode = next === "si" ? state.code : metricCode;
+    } else {
+      convertState(next);
+      state.units = next;
+    }
+    unitsUndo = { units: before.units, state: before, produced: JSON.stringify(state) };
+    rememberUnits(next);
+    t = applyStrings(strings, lang, document, state.units);
+    renderCodes();
+    renderMaterials();
+    for (const field of spec.numbers) $(field.id).value = state[field.id];
+    for (const id of barIds) {
+      const [group, key] = spec.bars[id];
+      $(id).value = state.rebar[group][key] ?? 0;
+    }
+    renderCombos();
+    renderUnits();
+    schedule({ now: true });
   }
 
   function renderCombos() {
@@ -709,7 +859,8 @@ export async function start(spec) {
 
   // Design → check hands the fields over already filled with the option picked in each group (5.5).
   function loadChosenIntoBars() {
-    if (!lastResult?.layouts) return;
+    // a result from before a change of units names its bars in the other system
+    if (!lastResult?.layouts || (lastResult.units || "si") !== state.units) return;
     state.rebar = spec.barsFromLayouts(lastResult.layouts);
     for (const id of barIds) {
       const [group, key] = spec.bars[id];
@@ -717,10 +868,20 @@ export async function start(spec) {
     }
   }
 
+  // The links back to the home open it in the page's language (home.js reads ?l=).
+  function linkHome() {
+    for (const link of document.querySelectorAll('a[href^="../"]')) {
+      const [path, anchor] = link.getAttribute("href").split("#");
+      if (path.split("?")[0] !== "../") continue;
+      link.setAttribute("href", `../?l=${lang}${anchor ? `#${anchor}` : ""}`);
+    }
+  }
+
   function applyLanguage(next) {
     lang = next;
     rememberLang(lang);
-    t = applyStrings(strings, lang);
+    linkHome();
+    t = applyStrings(strings, lang, document, state.units);
     renderCombos();
     if (lastResult) render(lastResult);
     else { renderPlaceholders(); renderPreview(); }
@@ -748,9 +909,11 @@ export async function start(spec) {
     }
   }
 
-  t = applyStrings(strings, lang);
-  fillSelect($("code"), Object.keys(MATERIALS).map((code) => [code, code === "EN 1992-2004" ? "EN 1992" : code]), state.code);
+  t = applyStrings(strings, lang, document, state.units);
+  linkHome();
+  renderCodes();
   renderMaterials();
+  renderUnits();
   for (const field of spec.numbers) {
     $(field.id).value = state[field.id];
     numberField($(field.id), () => { state[field.id] = $(field.id).value; schedule(); });
@@ -767,9 +930,10 @@ export async function start(spec) {
 
   $("code").addEventListener("change", () => {
     state.code = $("code").value;
-    const [fc, fy] = DEFAULT_MATERIALS[state.code];
-    if (!MATERIALS[state.code].concrete.some(([value]) => value === state.fc)) state.fc = fc;
-    if (!MATERIALS[state.code].steel.some(([value]) => value === state.fy)) state.fy = fy;
+    const materials = materialsFor(state.units)[state.code];
+    const [fc, fy] = (state.units === "us" ? DEFAULT_MATERIALS_US : DEFAULT_MATERIALS)[state.code];
+    if (!materials.concrete.some(([value]) => value === state.fc)) state.fc = fc;
+    if (!materials.steel.some(([value]) => value === state.fy)) state.fy = fy;
     renderMaterials();
     schedule({ now: true });
   });
@@ -778,6 +942,7 @@ export async function start(spec) {
   $("add").addEventListener("click", addForce);
   radiogroup($("mode"), (button) => setMode(button.dataset.mode));
   radiogroup(document.querySelector(".top .seg"), (button) => applyLanguage(button.dataset.lang));
+  radiogroup($("units"), (button) => setUnits(button.dataset.units));
   $("to-check").addEventListener("click", () => { loadChosenIntoBars(); setMode("check"); });
   $("to-design").addEventListener("click", () => setMode("design"));
 

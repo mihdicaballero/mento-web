@@ -22,8 +22,8 @@ PAGES = {
 }
 LANGS = ("es", "en")
 # Engineering notation, the same in every language: numbers and areas, bar layouts such as
-# "2Ø16 + 1Ø12", the symbols the design system uses as field labels (M, V, c/, eØ) and units.
-NOTATION = re.compile(r"[\d.]+( cm²)?|\d+Ø\d+( \+ \d+Ø\d+)*|[A-Za-zØ+×·/−]{1,3}|cm|mm|MPa|kN|kNm|cm²|· mento")
+# "2Ø16+1Ø12" or "1eØ6/28cm", the symbols the design system uses as field labels (M, V, c/, eØ) and units.
+NOTATION = re.compile(r"[\d.]+( cm²)?|\d+Ø\d+(\+\d+Ø\d+)*|[A-Za-zØ+×·/−]{1,3}|cm|mm|MPa|kN|kNm|cm²|· mento")
 
 
 class _Strings(HTMLParser):
@@ -72,6 +72,27 @@ def _strings(page: str) -> dict[str, dict[str, str]]:
     return json.loads((ROOT / "shared" / "i18n" / f"{page}.json").read_text(encoding="utf-8"))
 
 
+# shared/i18n.js UNIT_WORDS: how each system writes the units a text names as {u_len}, {u_moment}...
+UNIT_WORDS = {
+    "si": {"len": "cm", "cov": "mm", "span": "cm", "force": "kN", "moment": "kNm"},
+    "us": {"len": "in", "cov": "in", "span": "ft", "force": "kip", "moment": "kip-ft"},
+}
+
+
+def _resolve(strings: dict[str, str], units: str) -> dict[str, str]:
+    """shared/i18n.js resolveStrings: the US variants in, the unit tokens filled."""
+
+    def pick(key: str) -> str:
+        return strings[f"{key}_us"] if units == "us" and f"{key}_us" in strings else strings[key]
+
+    def fill(text: str) -> str:
+        return re.sub(r"\{u_(\w+)\}", lambda m: UNIT_WORDS[units].get(m[1]) or pick(f"u_{m[1]}"), text)
+
+    return {
+        key: fill(pick(key)) if isinstance(pick(key), str) else pick(key) for key in strings if not key.endswith("_us")
+    }
+
+
 def _parse(page: str) -> _Strings:
     parser = _Strings()
     parser.feed(PAGES[page].read_text(encoding="utf-8"))
@@ -88,7 +109,7 @@ def test_every_key_is_translated(page):
 
 @pytest.mark.parametrize("page", PAGES)
 def test_first_paint_is_the_spanish_of_the_dictionary(page):
-    es, parsed = _strings(page)["es"], _parse(page)
+    es, parsed = _resolve(_strings(page)["es"], "si"), _parse(page)
     for key, texts in parsed.texts.items():
         assert texts == {es[key]}, key
 
@@ -98,6 +119,8 @@ def test_no_ui_text_outside_the_dictionary(page):
     """What is not translated must be a name, a number or a symbol, never copy."""
     names = {"mento", "/", "ES", "EN", "GitHub", "LinkedIn", "Me lo dijo un ingeniero", "RAMÉ Ingeniería", "·"}
     names |= {
+        "SI",
+        "US",
         "1",
         "2",
         "3",
@@ -132,7 +155,7 @@ def test_hero_shows_the_worked_example():
     bottom, top, shear = result["flexure"]["bottom"], result["flexure"]["top"], result["shear"]
     assert hero["bottom"] == hero["opt1"] == bottom["bars"]
     assert hero["top"] == top["bars"]
-    assert hero["stirrups"] == shear["stirrups"].replace(" cm", "").replace("/", " c/")
+    assert hero["stirrups"] == shear["stirrups"]
     assert (hero["width"], hero["height"]) == (f"{beam.EXAMPLE['width']} cm", f"{beam.EXAMPLE['height']} cm")
     assert hero["bottom_dcr"] == hero["opt1_dcr"] == f"{bottom['DCR']:.2f}"
     assert hero["top_dcr"] == f"{top['DCR']:.2f}"
@@ -171,6 +194,34 @@ def test_hero_options_are_what_mento_proposes():
         corners = {min(bar["x"] for bar in low), max(bar["x"] for bar in low)}
         between = [f"{bar['x']:g},{bar['y']:g},{bar['d']:g}" for bar in low if bar["x"] not in corners]
         assert mid.split(";") == between
+
+
+def test_the_us_hero_is_the_us_example():
+    """What home.js draws for a visitor in US units: beam/'s US example, option by option, as mento gives it."""
+    source = PAGES["home"].read_text(encoding="utf-8")
+    data = json.loads(re.search(r'<script type="application/json" id="hero-us">(.*?)</script>', source, re.DOTALL)[1])
+    result = json.loads(beam.run(json.dumps(beam.EXAMPLE_US)))
+    section = result["section"]
+    assert (data["width"], data["height"], data["cover"]) == (section["width"], section["height"], section["cover"])
+    assert data["stirrup"] == section["stirrups"]["d"]
+    assert data["bars"] == [[bar["x"], bar["y"], bar["d"]] for bar in section["bars"]]
+    assert (data["top"], data["stirrups"]) == (result["rebar"]["top"], result["rebar"]["st"])
+    assert (data["data_top"], data["data_st"]) == (
+        signature(result["layouts"]["top"]),
+        signature(result["layouts"]["st"]),
+    )
+    ledger = {row["key"]: f"{row['dcr']:.2f}" for row in result["ledger"]}
+    assert (data["top_dcr"], data["shear_dcr"]) == (ledger["flexure_top"], ledger["shear"])
+    assert len(data["options"]) == len(result["options"]["bot"]) == 3  # the markup has three options to fill
+    for shown, option in zip(data["options"], result["options"]["bot"], strict=True):
+        assert (shown["sig"], shown["bars"], shown["area"]) == (option["signature"], option["bars"], option["area"])
+        assert shown["dcr"] == f"{option['dcr']:.2f}"
+        picked = json.loads(beam.run(json.dumps({**beam.EXAMPLE_US, "choice": {"bot": shown["sig"]}})))
+        moved = {row["key"]: f"{row['dcr']:.2f}" for row in picked["ledger"]}
+        assert moved == {"flexure_bottom": shown["dcr"], "flexure_top": data["top_dcr"], "shear": data["shear_dcr"]}
+        assert max(row["dcr"] for row in picked["ledger"]) == picked["ledger"][0]["dcr"]
+        low = [bar for bar in picked["section"]["bars"] if bar["y"] < section["height"] / 2]
+        assert shown["low"].split(";") == [f"{bar['x']:g},{bar['y']:g},{bar['d']:g}" for bar in low]
 
 
 # The four beams of mento's user guide (BeamSummary), a units row first as the Excel carries it.

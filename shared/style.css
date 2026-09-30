@@ -635,6 +635,9 @@ body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
 .seg button + button{border-left:0}
 .seg button:hover{background:transparent;color:var(--ink)}
 .seg button[aria-checked="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(15,23,42,.12),0 0 0 1px rgba(15,23,42,.05)}
+/* the units switch sits in a row of fields: as tall as the select beside it */
+.field .seg{height:var(--ctl-h)} .field .seg button{padding:0 6px}
+@container calc (max-width: 720px){ .field .seg{height:var(--ctl-h-touch)} }
 
 /* rebar groups: the chosen option's DCR as a pill */
 .grp{border-color:var(--line-2);border-radius:8px;box-shadow:var(--sh-1);overflow:hidden}

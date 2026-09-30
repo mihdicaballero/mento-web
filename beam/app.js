@@ -1,6 +1,6 @@
 // The rectangular beam: what makes this calculator different from the others.
 // Everything it shares with them lives in shared/calculator.js.
-import { CONCRETE_CLASS, dimBelow, dimLeft, num, start } from "../shared/calculator.js";
+import { CONCRETE_CLASS, dimBelow, dimLeft, fmt, num, pyUnits, start } from "../shared/calculator.js";
 
 const EXAMPLE = {
   code: "CIRSOC 201-25", fc: 25, fy: 420, width: 20, height: 60, cover: 25, label: "V-101", mode: "design",
@@ -16,10 +16,25 @@ const EXAMPLE = {
   },
   choice: {},
 };
+// The same beam for the US (py/beam.py EXAMPLE_US): inches, psi, Grade 60, kip-ft, ASTM bar sizes.
+const EXAMPLE_US = {
+  code: "ACI 318-19", fc: 4000, fy: 60, width: 12, height: 24, cover: 1.5, label: "B-101", mode: "design",
+  forces: [
+    { label: "1.4D", M_y: 45, V_z: 20, N_x: 0 },
+    { label: "1.2D+1.6L", M_y: 72, V_z: 30, N_x: 0 },
+    { label: "0.9D+1.0E", M_y: -58, V_z: 26, N_x: 7 },
+  ],
+  rebar: {
+    bot: { n1: 2, d1: 6, n2: 0, d2: 0, n3: 0, d3: 0, n4: 0, d4: 0 },
+    top: { n1: 2, d1: 5, n2: 1, d2: 4, n3: 0, d3: 0, n4: 0, d4: 0 },
+    stirrups: { n: 1, d: 3, s: 10 },
+  },
+  choice: {},
+};
 
 // The section, drawn here rather than by beam.plot(), so the page never loads matplotlib.
-// Geometry arrives in cm with the origin at the bottom left corner; SVG's y axis points down.
-function drawing(result, t, phone) {
+// Geometry arrives in cm (or in) with the origin at the bottom left corner; SVG's y axis points down.
+function drawing(result, t, phone, U) {
   const { width, height, cover, stirrups, bars } = result.section;
   const box = phone ? { w: 343, h: 210, scale: 3 } : { w: 556, h: 300, scale: 3.5 };
   // The frame keeps a band on top for its label and its Copiá button (44 px tall on the phone),
@@ -28,7 +43,7 @@ function drawing(result, t, phone) {
   const note = `${width} × ${height}`;
   const room = { top: phone ? 56 : 40, bottom: 30, left: phone ? 40 : 60, right: phone ? 100 : 130 };
   const scale = Math.min(
-    box.scale,
+    box.scale * U.scale,
     (box.h - room.top - room.bottom) / height,
     (box.w - room.left - room.right) / width,
   );
@@ -62,30 +77,32 @@ function drawing(result, t, phone) {
   if (result.rebar.st) {
     parts.push(`<text class="dw-label dw-label--stirrup" x="${labelX}" y="${y0 + h / 2}">${result.rebar.st}</text>`);
   }
-  parts.push(dimBelow(x0, x0 + w, y0 + h, y0 + h + 14, `${width} cm`), dimLeft(y0, y0 + h, x0, x0 - 14, `${height} cm`));
+  parts.push(dimBelow(x0, x0 + w, y0 + h, y0 + h + 14, `${fmt(width)} ${U.len}`),
+    dimLeft(y0, y0 + h, x0, x0 - 14, `${fmt(height)} ${U.len}`));
   const description = t.fig_section.replace("{section}", note)
     .replace("{bars}", [result.rebar.bot, result.rebar.top, result.rebar.st].filter(Boolean).join(", "));
   return `<svg viewBox="0 0 ${box.w} ${box.h}" width="${box.w}" height="${box.h}" style="max-width:100%;height:auto"`
     + ` role="img" aria-label="${description}">${parts.join("")}</svg>`;
 }
 
-const face = (layout) => Object.keys(layout).filter((key) => key.startsWith("n"))
-  .map((key) => `n${key.slice(1)}=${layout[key]}, d_b${key.slice(1)}=${layout[`d${key.slice(1)}`]} * mm`).join(", ");
+const face = (layout, P) => Object.keys(layout).filter((key) => key.startsWith("n"))
+  .map((key) => `n${key.slice(1)}=${layout[key]}, d_b${key.slice(1)}=${P.bar(layout[`d${key.slice(1)}`])}`).join(", ");
 
 function python(state, result) {
   const concrete = CONCRETE_CLASS[state.code];
+  const P = pyUnits(state.units);
   const lines = [
     `from mento import ${concrete}, SteelBar, RectangularBeam, Node, Forces`,
-    "from mento import MPa, cm, mm, kN, kNm",
+    P.imports,
     "",
-    `concrete = ${concrete}(name="${state.code}", f_c=${state.fc} * MPa)`,
-    `steel = SteelBar(name="fy ${state.fy}", f_y=${state.fy} * MPa)`,
+    `concrete = ${concrete}(name="${state.code}", f_c=${P.fc(state.fc)})`,
+    `steel = SteelBar(name="fy ${state.fy}", f_y=${P.fy(state.fy)})`,
     `beam = RectangularBeam(label="${state.label}", concrete=concrete, steel_bar=steel,`,
-    `                       width=${num(state.width)} * cm, height=${num(state.height)} * cm, c_c=${num(state.cover)} * mm)`,
+    `                       width=${P.len(num(state.width))}, height=${P.len(num(state.height))}, c_c=${P.cov(num(state.cover))})`,
     "forces = [",
     ...state.forces.filter((force) => num(force.M_y) || num(force.V_z)).map((force) =>
-      `    Forces(label="${force.label}", M_y=${num(force.M_y) || 0} * kNm, V_z=${num(force.V_z) || 0} * kN,`
-      + ` N_x=${num(force.N_x) || 0} * kN),`),
+      `    Forces(label="${force.label}", M_y=${P.moment(num(force.M_y) || 0)}, V_z=${P.force(num(force.V_z) || 0)},`
+      + ` N_x=${P.force(num(force.N_x) || 0)}),`),
     "]",
     "node = Node(section=beam, forces=forces)",
     "",
@@ -97,10 +114,10 @@ function python(state, result) {
     lines.push("# Let mento design the reinforcement", "node.design()");
   } else if (layouts) {
     lines.push("# Set the reinforcement");
-    if (layouts.bot) lines.push(`beam.set_longitudinal_rebar_bot(${face(layouts.bot)})`);
-    if (layouts.top && Object.keys(layouts.top).length) lines.push(`beam.set_longitudinal_rebar_top(${face(layouts.top)})`);
+    if (layouts.bot) lines.push(`beam.set_longitudinal_rebar_bot(${face(layouts.bot, P)})`);
+    if (layouts.top && Object.keys(layouts.top).length) lines.push(`beam.set_longitudinal_rebar_top(${face(layouts.top, P)})`);
     if (layouts.st?.n) {
-      lines.push(`beam.set_transverse_rebar(n_stirrups=${layouts.st.n}, d_b=${layouts.st.d} * mm, s_l=${layouts.st.s} * cm)`);
+      lines.push(`beam.set_transverse_rebar(n_stirrups=${layouts.st.n}, d_b=${P.bar(layouts.st.d)}, s_l=${P.len(layouts.st.s)})`);
     }
   }
   return lines.concat([
@@ -153,10 +170,11 @@ function barsFromLayouts(layouts) {
 start({
   module: "beam",
   example: EXAMPLE,
+  exampleUS: EXAMPLE_US,
   numbers: [
-    { id: "width" },
-    { id: "height", rule: (state, number) => (number(state.height) <= 2 * (number(state.cover) / 10) ? "err_height" : "") },
-    { id: "cover" },
+    { id: "width", unit: "len" },
+    { id: "height", unit: "len", rule: (state, number, U) => (number(state.height) <= 2 * U.cover(number(state.cover)) ? "err_height" : "") },
+    { id: "cover", unit: "cov" },
   ],
   forces: ["M_y", "V_z", "N_x"],
   groups: [{ key: "bot", label: "bot" }, { key: "top", label: "top" }, { key: "st", label: "st" }],
@@ -171,9 +189,9 @@ start({
   tables: ["flexure", "shear"],
   drawing,
   // the section as typed, before the first result: no bars yet, the stirrup still dashed
-  preview: (state) => ({
+  preview: (state, U) => ({
     section: {
-      width: num(state.width), height: num(state.height), cover: num(state.cover) / 10,
+      width: num(state.width), height: num(state.height), cover: U.cover(num(state.cover)),
       stirrups: { n: 0, d: 0 }, bars: [], labels: { top: [], bot: [] },
     },
     rebar: {},
