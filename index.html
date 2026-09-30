@@ -34,7 +34,7 @@
 </svg>
 
 <div class="page home">
-<header class="top"><a class="brand" href="./"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a><span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="calc">Calculadoras</span><span class="sub" data-i18n="homesub">hormigón armado · en tu navegador</span><span class="spacer"></span><nav><a href="#calcs" data-i18n="calc">Calculadoras</a><a href="#python" data-i18n="nav_py">Python</a><a href="#firms" class="nav-firms" data-i18n="nav_biz">Empresas</a><a href="https://mento-docs.readthedocs.io/en/latest/" data-i18n="docs">Docs</a><div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div></nav></header>
+<header class="top"><a class="brand" href="./"><svg aria-hidden="true"><use href="#i-logo"/></svg>mento</a><span class="crumb" aria-hidden="true">/</span><span class="title" data-i18n="calc">Calculadoras</span><span class="sub" data-i18n="homesub">hormigón armado · en tu navegador</span><span class="spacer"></span><nav><a href="#calcs" data-i18n="calc">Calculadoras</a><a href="#python" class="nav-py" data-i18n="nav_py">Python</a><a href="#firms" class="nav-firms" data-i18n="nav_biz">Empresas</a><a href="https://mento-docs.readthedocs.io/en/latest/" class="nav-docs" data-i18n="docs">Docs</a><div class="seg seg--small" role="radiogroup" data-i18n-aria="lang_label" aria-label="Idioma"><button type="button" role="radio" aria-checked="true" data-lang="es">ES</button><button type="button" role="radio" aria-checked="false" data-lang="en">EN</button></div><div class="seg seg--small" id="units" role="radiogroup" data-i18n-aria="aria_units" aria-label="Sistema de unidades"><button type="button" role="radio" aria-checked="true" data-units="si">SI</button><button type="button" role="radio" aria-checked="false" data-units="us">US</button></div></nav></header>
 <main class="calc">
 <section class="hero">
   <div>
@@ -42,7 +42,7 @@
     <h1 class="t-h1" data-i18n="h1">Diseñá la armadura o verificá la tuya. Rápido, gratis y con la memoria lista.</h1>
     <p class="lead" data-i18n="h1p">Cargás la sección y los esfuerzos; mento propone el armado, verifica flexión y corte por combinación y te deja la memoria en Word. Recalcula mientras escribís, en tu navegador.</p>
     <div class="cta"><a href="beam/" class="btn" data-i18n="cta1">Abrir la calculadora →</a><a href="#calcs" class="btn btn--sec" data-i18n="cta2">Ver las calculadoras</a></div>
-    <div class="facts"><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_free">Gratis</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_test">Testeado contra ejemplos publicados</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_noreg">Sin registro</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_lang">Español e inglés</span></span></div>
+    <div class="facts"><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_free">Gratis</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_test">Testeado contra ejemplos publicados</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_noreg">Sin registro</span></span><span class="fact"><i><svg width="9" height="9" aria-hidden="true"><use href="#i-check"/></svg></i><span data-i18n="f_lang">Español e inglés, SI y US</span></span></div>
   </div>
   <!-- The worked example of beam/ (py/beam.py EXAMPLE); py/test_site.py keeps these numbers in step with mento.
        Each option carries its signature and its middle bottom bars (x,y,d in cm); home.js swaps them in. -->
@@ -69,6 +69,10 @@
       <span class="sum-line"><span data-i18n="fl_w">flexión</span> <span data-hero="sum_flex">0.88</span> · <span data-i18n="sh_s">corte</span> <span data-hero="sum_shear">0.65</span></span>
     </div>
   </div>
+  <!-- The same hero in US units: beam/'s US example (py/beam.py EXAMPLE_US), which home.js draws in its
+       place when the visitor's units are US. Lengths in inches; each option's "low" is all its bottom
+       bars (x,y,d), since in US sizes an option changes the corner bars too. py/test_site.py checks it. -->
+  <script type="application/json" id="hero-us">{"width":12.0,"height":24.0,"cover":1.5,"stirrup":0.375,"bars":[[2.411,2.411,0.75],[9.589,2.411,0.75],[2.349,21.651,0.625],[9.651,21.651,0.625],[6.0,21.875,0.5]],"top":"2#5 + 1#4","stirrups":"#3 @ 10 in","data_top":"2x5+1x4","data_st":"1x3@10","options":[{"sig":"2x6","low":"2.411,2.411,0.75;9.589,2.411,0.75","bars":"2#6","area":"0.88 in²","dcr":"0.86"},{"sig":"2x5+1x5","low":"2.349,2.349,0.625;9.651,2.349,0.625;6,2.188,0.625","bars":"3#5","area":"0.92 in²","dcr":"0.82"},{"sig":"2x5+2x4","low":"2.349,2.349,0.625;9.651,2.349,0.625;4.708,2.125,0.5;7.292,2.125,0.5","bars":"2#5 + 2#4","area":"1.01 in²","dcr":"0.75"}],"top_dcr":"0.75","shear_dcr":"0.65"}</script>
 </section>
 
 <section class="steps-band"><div class="eyebrow" data-i18n="how">Cómo funciona</div>
