@@ -4,10 +4,11 @@ import base64
 import io
 import json
 import re
+from pathlib import Path
 
-import common
 import docx
 import pytest
+from mento.bar_sizes import ASTM_BAR_DIAMETERS
 
 import beam
 import slab
@@ -53,7 +54,7 @@ def test_a_beam_names_its_bars_by_astm_size():
         for option in result["options"][group]:
             assert BARS.fullmatch(option["bars"]) and option["area"].endswith(" in²")
             sizes = [value for key, value in option["layout"].items() if key.startswith("d")]
-            assert set(sizes) <= set(common.ASTM_BARS)
+            assert set(sizes) <= set(ASTM_BAR_DIAMETERS)
     assert all(option["area"].endswith(" in²/ft") for option in result["options"]["st"])
     face = result["flexure"]["bottom"]
     assert face["A_s"].endswith(" in²") and face["M_capacity"].endswith(" kip-ft")
@@ -66,7 +67,7 @@ def test_a_mesh_is_a_bar_size_at_whole_inches(module):
     for options in result["options"].values():
         for option in options:
             assert MESH.fullmatch(option["bars"]) and option["area"].endswith(" in²/ft")
-            assert option["layout"]["d"] in common.ASTM_BARS
+            assert option["layout"]["d"] in ASTM_BAR_DIAMETERS
             assert 3 <= option["layout"]["s"] <= 18  # ACI 318-19: never wider than 18 in
 
 
@@ -184,12 +185,9 @@ def test_the_report_is_written():
 METRIC = re.compile(r"\b(cm²/m|cm²|cm|mm|kNm|kN·m|kN|MPa)\b(?!,)")
 
 
-@pytest.mark.xfail(
-    reason="mento 1.3.0 prints imperial elements in metric; the release after 1.3.1 fixes it", strict=True
-)
 @pytest.mark.parametrize("module", MODULES, ids=lambda module: module.__name__)
 def test_mentos_tables_and_report_are_in_us_units(module):
-    """When this passes, bump MENTO_VERSION and drop the xfail (and common.ASTM_BARS)."""
+    """Since mento 1.4.0 an element in US units prints in them: its tables, detailed results and report."""
     result = solve(module)
     for table in result["tables"].values():
         assert not [unit for unit in table["units"] if METRIC.search(unit)], table["units"]
@@ -198,3 +196,11 @@ def test_mentos_tables_and_report_are_in_us_units(module):
     document = docx.Document(io.BytesIO(base64.b64decode(file["base64"])))
     text = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
     assert not METRIC.findall(text + " ".join(paragraph.text for paragraph in document.paragraphs))
+
+
+def test_the_pages_bar_sizes_are_mentos():
+    """The page converts bars itself when it changes system (shared/calculator.js ASTM): mento's table."""
+    source = (Path(__file__).parent.parent / "shared" / "calculator.js").read_text(encoding="utf-8")
+    table = re.search(r"export const ASTM = \{([^}]*)\}", source)[1]
+    page = {int(size): float(inches) for size, inches in re.findall(r"(\d+): ([\d.]+)", table)}
+    assert page == {size: float(diameter.to("inch").magnitude) for size, diameter in ASTM_BAR_DIAMETERS.items()}

@@ -66,8 +66,9 @@ export const UNITS = {
   si: { name: "si", ...UNIT_WORDS.si, scale: 1, cover: (value) => value / 10, toSpan: (value) => value },
   us: { name: "us", ...UNIT_WORDS.us, scale: 2.54, cover: (value) => value, toSpan: (value) => value / 12 },
 };
-// ASTM A615 bar size -> nominal diameter in inches (py/common.py keeps the same table), and the metric
-// catalogue a bar goes back to when the page changes system.
+// ASTM A615 bar size -> nominal diameter in inches, as mento has it (mento.bar_sizes; py/test_us.py keeps
+// the two in step): the page needs it to convert bars when it changes system, before Python answers.
+// And the metric catalogue a bar goes back to.
 export const ASTM = { 3: 0.375, 4: 0.5, 5: 0.625, 6: 0.75, 7: 0.875, 8: 1, 9: 1.128, 10: 1.27, 11: 1.41, 14: 1.693 };
 const METRIC_BARS = [6, 8, 10, 12, 16, 20, 25, 32];
 // How the rebar fields name a bar and a spacing: Ø16 c/15 cm, or #5 @ 6 in (the results write them Ø16c/15cm, #5@6in).
@@ -79,11 +80,11 @@ export const fmt = (value) => String(Number(Number(value).toFixed(2)));
 export function pyUnits(units) {
   if (units === "us") {
     return {
-      imports: "from mento import psi, ksi, inch, ft, kip",
+      imports: "from mento import psi, ksi, inch, ft, kip, bar_diameter",
       fc: (value) => `${value} * psi`, fy: (value) => `${value} * ksi`,
       len: (value) => `${value} * inch`, cov: (value) => `${value} * inch`, span: (value) => `${value} * ft`,
       force: (value) => `${value} * kip`, moment: (value) => `${value} * kip * ft`,
-      bar: (size) => `${ASTM[size] ?? size} * inch`,
+      bar: (size) => `bar_diameter(${size})`,
     };
   }
   return {

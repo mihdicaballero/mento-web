@@ -27,7 +27,8 @@ from mento import (
     Concrete_EN_1992_2004,
     Forces,
     SteelBar,
-    inch,
+    bar_designation,
+    bar_diameter,
     ureg,
 )
 
@@ -64,11 +65,8 @@ def magnitude(value: Any, unit: str, precision: int = 1) -> float | None:
 
 
 # ------------------------------------------------------------------------ unit systems
-
-# ASTM A615 bar size -> nominal diameter in inches: #3 to #8 are n/8 in, the larger ones the round
-# bar of a whole area figure. The imperial catalogue mento designs with.
-# TODO(mento 1.4.0): use mento's own bar_designation / bar_diameter and drop this table.
-ASTM_BARS = {3: 0.375, 4: 0.5, 5: 0.625, 6: 0.75, 7: 0.875, 8: 1.0, 9: 1.128, 10: 1.27, 11: 1.41, 14: 1.693}
+# A US bar is named by its ASTM A615 size, as mento names it: bar_diameter(6) is 0.75 in and
+# bar_designation(0.75 in) is "#6". The table is mento's (mento.bar_sizes), never copied here.
 
 
 @dataclass(frozen=True)
@@ -100,19 +98,21 @@ class Units:
         """A layout's bar as mento takes it: a diameter."""
         if not self.us:
             return d * ureg.mm
-        if int(d) != d or int(d) not in ASTM_BARS:
-            raise InputError("rebar", "bar_size")
-        return ASTM_BARS[int(d)] * inch
+        try:
+            if int(d) != d:
+                raise ValueError(d)
+            return bar_diameter(int(d))
+        except ValueError:
+            raise InputError("rebar", "bar_size") from None
 
     def bar_of(self, d_b: Any) -> float:
         """What a layout calls a bar mento placed: its diameter in mm, or its ASTM size."""
         if not self.us:
             return round(float(d_b.to("mm").magnitude), 3)
-        inches = float(d_b.to("inch").magnitude)
-        for size, diameter in ASTM_BARS.items():
-            if math.isclose(inches, diameter, abs_tol=5e-4):
-                return size
-        raise ValueError(f"a bar of {inches:.3f} in is no ASTM size")
+        name = bar_designation(d_b)
+        if not name.startswith("#"):  # mento writes a diameter no ASTM size has as Ø0.70"
+            raise ValueError(f"a bar of {name} is no ASTM size")
+        return int(name[1:])
 
     def size(self, d: float) -> float:
         """A layout's bar diameter in ``length``, for the drawing."""
