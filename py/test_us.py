@@ -180,13 +180,21 @@ def test_the_report_is_written():
     assert docx.Document(io.BytesIO(base64.b64decode(file["base64"]))).tables
 
 
-@pytest.mark.xfail(reason="mento 1.3.0 prints an imperial beam in metric; 1.4.0 fixes it", strict=True)
-def test_mentos_tables_and_report_are_in_us_units():
+# A metric unit, not the symbol of the mechanical cover (cm,top) nor that of a US unit.
+METRIC = re.compile(r"\b(cm²/m|cm²|cm|mm|kNm|kN·m|kN|MPa)\b(?!,)")
+
+
+@pytest.mark.xfail(
+    reason="mento 1.3.0 prints imperial elements in metric; the release after 1.3.1 fixes it", strict=True
+)
+@pytest.mark.parametrize("module", MODULES, ids=lambda module: module.__name__)
+def test_mentos_tables_and_report_are_in_us_units(module):
     """When this passes, bump MENTO_VERSION and drop the xfail (and common.ASTM_BARS)."""
-    result = solve(beam)
-    assert "in²" in result["tables"]["flexure"]["units"]
-    assert "cm" not in result["detailed"] and "kNm" not in result["detailed"]
-    (file,) = json.loads(beam.report(json.dumps(beam.EXAMPLE_US)))
+    result = solve(module)
+    for table in result["tables"].values():
+        assert not [unit for unit in table["units"] if METRIC.search(unit)], table["units"]
+    assert not METRIC.findall(result["detailed"])
+    (file,) = json.loads(module.report(json.dumps(module.EXAMPLE_US)))
     document = docx.Document(io.BytesIO(base64.b64decode(file["base64"])))
     text = " ".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
-    assert "cm²" not in text and "MPa" not in text
+    assert not METRIC.findall(text + " ".join(paragraph.text for paragraph in document.paragraphs))
