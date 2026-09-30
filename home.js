@@ -1,5 +1,5 @@
 // Home: its movement, language, the test count CI publishes, and a head start on the calculator.
-import { applyStrings, loadStrings, preferredLang, rememberLang } from "./shared/i18n.js";
+import { LANGS, applyStrings, loadStrings, preferredLang, rememberLang } from "./shared/i18n.js";
 import { calm, radiogroup, tween } from "./shared/ui.js";
 
 // ------------------------------------------------------------ the hero in US units
@@ -13,7 +13,11 @@ const card = document.querySelector(".ccard--featured .fig svg");
 const HERO_SI = { hero: hero.innerHTML, top: hero.dataset.top, st: hero.dataset.st, card: card.innerHTML };
 const HERO_US = JSON.parse(document.getElementById("hero-us").textContent);
 const unitsOf = (language) => (language === "en" ? "us" : "si");
-let units = unitsOf(preferredLang());
+// A shared link names its language (?l=en), over the visitor's own: the address keeps the one on
+// screen, so the link copied from it opens as it was seen. Not a #: the home's anchors use it.
+const linkedLang = new URLSearchParams(location.search).get("l");
+const firstLang = LANGS.includes(linkedLang) ? linkedLang : preferredLang();
+let units = unitsOf(firstLang);
 
 function beamDrawing(data, hooks) {
   const scale = 300 / data.height;
@@ -185,7 +189,19 @@ function countWhenSeen(element, value) {
 
 // ------------------------------------------------------------ language and figures
 const strings = await loadStrings("home");
-let lang = preferredLang();
+let lang = firstLang;
+
+// The language in the address, and in the links to the calculators, which read it from their hash
+// (the hero's own link carries a whole design, and names it itself).
+function linkLang() {
+  const url = new URL(location.href);
+  url.searchParams.set("l", lang);
+  history.replaceState(null, "", url);
+  for (const link of document.querySelectorAll('a[href^="beam/"]:not(#hero-check), a[href^="slab/"], a[href^="wall/"]')) {
+    link.setAttribute("href", `${link.getAttribute("href").split("#")[0]}#l=${lang}`);
+  }
+}
+
 const langGroup = radiogroup(document.querySelector(".top .seg"), (button) => {
   lang = button.dataset.lang;
   rememberLang(lang);
@@ -193,8 +209,10 @@ const langGroup = radiogroup(document.querySelector(".top .seg"), (button) => {
   showUnits(units);
   applyStrings(strings, lang, document, units);
   linkHero(pickedOption());
+  linkLang();
 });
 applyStrings(strings, lang, document, units);
+linkLang();
 langGroup.sync();
 // a page come back to may keep the option picked before; the markup shows the first
 if (pickedOption() !== hero.querySelector(".opt")) pickOption(pickedOption(), { animate: false });

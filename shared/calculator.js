@@ -868,9 +868,19 @@ export async function start(spec) {
     }
   }
 
+  // The links back to the home open it in the page's language (home.js reads ?l=).
+  function linkHome() {
+    for (const link of document.querySelectorAll('a[href^="../"]')) {
+      const [path, anchor] = link.getAttribute("href").split("#");
+      if (path.split("?")[0] !== "../") continue;
+      link.setAttribute("href", `../?l=${lang}${anchor ? `#${anchor}` : ""}`);
+    }
+  }
+
   function applyLanguage(next) {
     lang = next;
     rememberLang(lang);
+    linkHome();
     t = applyStrings(strings, lang, document, state.units);
     renderCombos();
     if (lastResult) render(lastResult);
@@ -900,6 +910,7 @@ export async function start(spec) {
   }
 
   t = applyStrings(strings, lang, document, state.units);
+  linkHome();
   renderCodes();
   renderMaterials();
   renderUnits();
